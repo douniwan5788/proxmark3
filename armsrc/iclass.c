@@ -1192,7 +1192,7 @@ static int SendIClassAnswer(uint8_t *resp, int respLen, int delay)
 	uint8_t b = 0;
 	// return 0;
 	// Modulate Manchester
-	// FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD424);
+	// FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD423);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD);
 	AT91C_BASE_SSC->SSC_THR = 0x00;
 	FpgaSetupSsc();

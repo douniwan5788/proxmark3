@@ -201,7 +201,7 @@ hi_iso14443a hisn(
 //   101 --  HF ISO14443-A
 //   110 --  LF passthrough
 //   111 --  everything off
-
+                                                //000		  001           010           011             100           101             110           111
 mux8 mux_ssp_clk		(major_mode, ssp_clk,   lr_ssp_clk,   ls_ssp_clk,   ht_ssp_clk,   hrxc_ssp_clk,   hs_ssp_clk,   hisn_ssp_clk,   lp_ssp_clk,   1'b0);
 mux8 mux_ssp_din		(major_mode, ssp_din,   lr_ssp_din,   ls_ssp_din,   ht_ssp_din,   hrxc_ssp_din,   hs_ssp_din,   hisn_ssp_din,   lp_ssp_din,   1'b0);
 mux8 mux_ssp_frame		(major_mode, ssp_frame, lr_ssp_frame, ls_ssp_frame, ht_ssp_frame, hrxc_ssp_frame, hs_ssp_frame, hisn_ssp_frame, lp_ssp_frame, 1'b0);

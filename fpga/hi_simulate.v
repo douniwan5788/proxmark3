@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 // Pretend to be an ISO 14443 tag. We will do this by alternately short-
 // circuiting and open-circuiting the antenna coil, with the tri-state
-// pins. 
+// pins.
 //
 // We communicate over the SSP, as a bitstream (i.e., might as well be
 // unframed, though we still generate the word sync signal). The output
@@ -90,6 +90,8 @@ always @(mod_type or ssp_clk or ssp_dout)
         modulating_carrier <= ssp_dout ^ ssp_clk_divider[3]; // XOR means BPSK
     else if(mod_type == 3'b010)
         modulating_carrier <= ssp_dout & ssp_clk_divider[5]; // switch 212kHz subcarrier on/off
+    else if(mod_type == 3'b100)
+        modulating_carrier <= ssp_dout & ssp_clk_divider[4]; // switch 423kHz subcarrier on/off
     else
         modulating_carrier <= 1'b0;                           // yet unused
 

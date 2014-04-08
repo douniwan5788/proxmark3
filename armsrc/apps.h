@@ -106,6 +106,7 @@ void SetAdcMuxFor(uint32_t whichGpio);
 #define FPGA_HF_ISO14443A_TAGSIM_MOD				(2<<0)
 #define FPGA_HF_ISO14443A_READER_LISTEN				(3<<0)
 #define FPGA_HF_ISO14443A_READER_MOD				(4<<0)
+#define FPGA_HF_ISO14443A_TAGSIM_MOD423				(5<<0)
 
 /// lfops.h
 void AcquireRawAdcSamples125k(int divisor);
@@ -181,7 +182,7 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 void RecordRawAdcSamplesIso15693(void);
 void AcquireRawAdcSamplesIso15693(void);
 void ReaderIso15693(uint32_t parameter);	// Simulate an ISO15693 reader - greg
-void SimTagIso15693(uint32_t parameter);	// simulate an ISO15693 tag - greg
+void SimTagIso15693(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);	// simulate an ISO15693 tag - greg,douniwan5788
 void BruteforceIso15693Afi(uint32_t speed); // find an AFI of a tag - atrox
 void DirectTag15693Command(uint32_t datalen,uint32_t speed, uint32_t recv, uint8_t data[]); // send arbitrary commands from CLI - atrox 
 void SetDebugIso15693(uint32_t flag);

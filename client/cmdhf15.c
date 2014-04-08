@@ -275,7 +275,30 @@ int CmdHF15Reader(const char *Cmd)
 // Simulation is still not working very good
 int CmdHF15Sim(const char *Cmd)
 {
-	UsbCommand c = {CMD_SIMTAG_ISO_15693, {strtol(Cmd, NULL, 0), 0, 0}};
+	uint8_t AFI = 0, DSFID = 0, EAS = 0;
+	uint8_t UID[8] = {0, 0, 0, 0, 0, 0, 0, 0xE0};
+
+	if (param_getchar(Cmd, 0) == 'h') {
+		PrintAndLog("Usage:  hf 15 sim  [UID (16 hex symbols) [AFI [DSFID [EAS]]]]");
+		PrintAndLog("        UID[5] is used as 'IC reference' responsed in Get system information Cmd");
+		PrintAndLog("        sample: hf 15 sim 031FEC8AF7FF12E0");
+		return 0;
+	}	
+
+	if (param_gethex(Cmd, 0, UID, 16)) {
+		PrintAndLog("A UID should consist of 16 HEX symbols");
+		// return 1;
+	}
+
+	AFI = param_get8ex(Cmd, 1, 0, 16);
+	DSFID = param_get8ex(Cmd, 2, 0, 16);
+	EAS = param_get8ex(Cmd, 3, 0, 16);
+
+
+	PrintAndLog("--AFI:%02x --DSFID:%02x --EAS:%02x UID:%s", AFI, DSFID, EAS, sprint_hex(UID, 8));
+
+	UsbCommand c = {CMD_SIMTAG_ISO_15693, {AFI, DSFID, EAS}};
+	memcpy(c.d.asBytes, UID, 8);
 	SendCommand(&c);
 	return 0;
 }

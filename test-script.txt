@@ -1,0 +1,77 @@
+hf 14a raw -s -p
+#hf 14a raw -d -p 00a4000002%04x00 0001 a					#select start-end
+#hf 14a raw -d -p 00a40000023f0000							#select 3f00
+#hf 14a raw -d -p 00a40400024d4600							#select "MF"
+#hf 14a raw -d -p 00a40400044d464d4600							#select "MFMF"
+#hf 14a raw -d -p 00a40400054d464d464d00							#select "MFMFM"
+#hf 14a raw -d -p 00a40000023f0100							#select 3f01
+#hf 14a raw -d -p 00a4000002100100							#select 1001
+#hf 14a raw -d -p 00a400000310000000							#select 100000
+#hf 14a raw -d -p 00a40000041000000000							#select 10000000
+#hf 14a raw -d -p 00a40000051000000000							#select 1000000000
+#hf 14a raw -d -p 00a404000E3%x5041592e5359532e444446303100 1 5	#select "*PAY.SYS.DDF01"
+#hf 14a raw -d -p 00a404000E315041592e5359532e444446303100	#select "1PAY.SYS.DDF01"
+#hf 14a raw -d -p 00a404000E325041592e5359532e444446303100	#select "2PAY.SYS.DDF01"
+hf 14a raw -d -p 00a4040008a00000000300000000				#select a000000003000000 CardManager
+#hf 14a raw -d -p 00a4040001@00 -n 30 39				#select "0"-"9"
+#hf 14a raw -d -p 00a4040001%02x00 41 46				#select "A"-"F"
+#hf 14a raw -d -p 00a4000002@@00 -n 3f00 3fff					#select 3f00 3fff
+#hf 14a raw -d -p 00a4000002@@00 -n 1000 10ff					#select 1000 10ff
+#hf 14a raw -d -p 00a4040001%x000 0 9				#select 00-90
+#hf 14a raw -d -p 00a4040001%x000 a f					#select A0-F0
+#hf 14a raw -d -p 00a4040005a00000033300					#select a000000333
+#hf 14a raw -d -p 00a4040205a00000033300					#select next a000000333
+#hf 14a raw -d -p 00a4040008a00000033301010%x00 1 6				#select a00000033301010*
+
+#hf 14a raw -d -p 00a4040008a00000033301010100				#select a000000333010101
+#hf 14a raw -d -p 00a4040008a00000033301010200				#select a000000333010102
+#hf 14a raw -d -p 00a4040008a00000033301010300				#select a000000333010103
+#hf 14a raw -d -p 00a4040008a00000033301010400				#select a000000333010104
+#hf 14a raw -d -p 00a4040008a00000033301010500				#select a000000333010105
+#hf 14a raw -d -p 00a4040008a00000033301010600				#select a000000333010106
+#hf 14a raw -d -p 00a4040009a0000000038698070100				#select a00000000386980701
+#hf 14a raw -d -p 00a4040009a0000000038698070200				#select a00000000386980702
+#hf 14a raw -d -p 00a4040009a0000000038698070300				#select a00000000386980703
+#hf 14a raw -d -p 00a4040009a0000000038698070400				#select a00000000386980704
+#hf 14a raw -d -p 00a4040009a0000000038698070500				#select a00000000386980705
+#hf 14a raw -d -p 00a4040009a0000000038698070600				#select a00000000386980705
+#hf 14a raw -d -p 00a4040009a0000000038698070700				#select a00000000386980705
+#hf 14a raw -d -p 00a4040009a0000000038698070800				#select a00000000386980705
+#hf 14a raw -d -p 00a4040009a0000000038698070900				#select a00000000386980705
+#hf 14a raw -d -p 00a4040009a0000000038698070a00				#select a00000000386980705
+
+
+
+#hf 14a raw -d -p 00b2@0400 -n 1 a							#record current file
+#hf 14a raw -d -p 00b2@0c00 -n 1 F							#record SFI 1 record 1~F
+
+#hf 14a raw -d -p 00b201%x400 1 F							#record SFI even
+#hf 14a raw -d -p 00b201%xc00 0 F							#record SFI odd
+
+#hf 14a raw -d -p 00b0@0000 -n 81 8f							#binary 1-f
+#hf 14a raw -d -p 00b0@0000 -n 90 9f							#binary 10-1f
+
+#hf 14a raw -d -p 00b0850000									#binary 0x0005	应用基本信息
+#hf 14a raw -d -p 00b0950000									#binary 0x0015	公共信息
+#hf 14a raw -d -p 00b0960000									#binary 0x0016	持卡人信息
+#hf 14a raw -d -p 00b2%02Xc400	1 a							#record 0x0018	交易明细	cjt/166
+
+#hf 14a raw -d -p 00b0850000									#binary 5
+#hf 14a raw -d -p 00b0000000									#binary current file
+
+#hf 14a raw -d -p 80ca9F%02x00 0 ff							#GET DATA 9f*
+#PBOC3.0
+#hf 14a raw -d -p 80caDF%02x00 71 7f							#GET DATA df*
+
+#hf 14a raw -d -p 805c000204									#get balance
+#hf 14a raw -d -p 0084000004									#get challenge 4
+
+#hf 14a raw -d -p 80a80000238321fe0000000000000000010000000000000156#00000000000156201302110000000000	#GPO
+#9f66:04终端交易属性 9f02:06授权金额 9f03:06其它金额 9f1a:02终端国家代码 95:05终端验证结果（TVR） 5f2a:02交易货币代码 9a:03交易日期 9c:01交易类型 9f37:04不可预知数
+#hf 14a raw -d -p 80a80000 00 83 21 66000000 000000000000 000000000000 0156 0000000000 0156 20130211 00 00000000 00	#GPO
+# 6 支持非接触式借记/贷记应用,支持 qPBOC,支持接触式借记/贷记应用,终端仅支持脱机,不支持联机 PIN,支持签名
+# 6 不要求联机密文,不要求 CVM								
+#hf 14a raw -d -p 80ca9F3600 			# 9F36 应用交易计数器(ATC)
+
+hf 14a raw -s
+quit

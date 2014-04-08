@@ -9,6 +9,8 @@
 `define TAGSIM_MOD		3'b010
 `define READER_LISTEN	3'b011
 `define READER_MOD		3'b100
+`define TAGSIM_MOD423	3'b101
+
 
 module hi_iso14443a(
     pck0, ck_1356meg, ck_1356megb,
@@ -363,7 +365,7 @@ reg mod_sig_coil;
 
 always @(negedge adc_clk)
 begin
-	if (mod_type == `TAGSIM_MOD)			 // need to take care of proper fdt timing
+	if ((mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD423))			 // need to take care of proper fdt timing
 	begin
 		if(fdt_counter == `FDT_COUNT)
 		begin
@@ -540,7 +542,7 @@ begin
 		// What do we communicate to the ARM
 		if(mod_type == `TAGSIM_LISTEN)
 			sendbit = after_hysteresis;
-		else if(mod_type == `TAGSIM_MOD)
+		else if((mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD423))
 			/* if(fdt_counter > 11'd772) sendbit = mod_sig_coil; // huh?
 			else */
 			sendbit = fdt_indicator;
@@ -554,7 +556,7 @@ begin
 	if(mod_type == `SNIFFER)
 		// send sampled reader and tag data:
 		bit_to_arm = to_arm[7];
-	else if (mod_type == `TAGSIM_MOD && fdt_elapsed && temp_buffer_reset)
+	else if ((mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD423) && fdt_elapsed && temp_buffer_reset)
 		// send timing information:
 		bit_to_arm = to_arm[7];
 	else
@@ -569,7 +571,7 @@ assign ssp_din = bit_to_arm;
 
 // Subcarrier (adc_clk/16, for TAGSIM_MOD only).
 wire sub_carrier;
-assign sub_carrier = ~sub_carrier_cnt[4];
+assign sub_carrier = ~sub_carrier_cnt[3 + (mod_type == `TAGSIM_MOD423)];
 
 // in READER_MOD: drop carrier for mod_sig_coil==1 (pause); in READER_LISTEN: carrier always on; in other modes: carrier always off
 assign pwr_hi = (ck_1356megb & (((mod_type == `READER_MOD) & ~mod_sig_coil) || (mod_type == `READER_LISTEN)));
@@ -582,7 +584,7 @@ assign pwr_oe3 = 1'b0;
 // TAGSIM_MOD: short circuit antenna with different resistances (modulated by sub_carrier modulated by mod_sig_coil)
 // for pwr_oe4 = 1 (tristate): antenna load = 10k || 33			= 32,9 Ohms
 // for pwr_oe4 = 0 (active):   antenna load = 10k || 33 || 33  	= 16,5 Ohms
-assign pwr_oe4 = ~(mod_sig_coil & sub_carrier & (mod_type == `TAGSIM_MOD));
+assign pwr_oe4 = ~(mod_sig_coil & sub_carrier & (mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD423));
 
 // This is all LF, so doesn't matter.
 assign pwr_oe2 = 1'b0;
