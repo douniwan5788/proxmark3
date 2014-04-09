@@ -35,6 +35,7 @@
 #include "cmdhf15.h"
 #include "iso15693tools.h"
 #include "cmdmain.h"
+#include "util.h"
 
 #define FrameSOF              Iso15693FrameSOF
 #define Logic0						Iso15693Logic0
@@ -275,30 +276,67 @@ int CmdHF15Reader(const char *Cmd)
 // Simulation is still not working very good
 int CmdHF15Sim(const char *Cmd)
 {
-	uint8_t AFI = 0, DSFID = 0, EAS = 0;
+	uint8_t AFI = 0, DSFID = 0, EAS = 0, i;
 	uint8_t UID[8] = {0, 0, 0, 0, 0, 0x01, 0x04, 0xE0};
+	char filename[256] = {"vicc_memory_map.bin"}, C;
 
-	if (param_getchar(Cmd, 0) == 'h') {
-		PrintAndLog("Usage:  hf 15 sim  [UID (16 hex symbols) [AFI [DSFID [EAS]]]]");
-		PrintAndLog("        UID[5] is used as 'IC reference' responsed in Get system information Cmd");
-		PrintAndLog("        sample: hf 15 sim 031FEC8AF7FF12E0");
-		return 0;
-	}	
-
-	if (param_gethex(Cmd, 0, UID, 16)) {
-		PrintAndLog("A UID should consist of 16 HEX symbols");
-		// return 1;
+	for (i = 0; C = param_getchar(Cmd,i); ++i)
+	{
+		switch (C) {
+		case 'u':
+		case 'U':
+			if (param_gethex(Cmd, ++i, UID, 16)) {
+				PrintAndLog("A UID should consist of 16 HEX symbols");
+				return 1;
+			}	
+			break;
+		case 'a':
+		case 'A':
+			AFI = param_get8ex(Cmd, ++i, 0, 16);
+			break;
+		case 'd':
+		case 'D':
+			DSFID = param_get8ex(Cmd, ++i, 0, 16);
+			break;
+		case 'e':
+		case 'E':
+			EAS = param_get8ex(Cmd, ++i, 0, 16);
+			break;	
+		case 'm':
+		case 'M':
+			if ( param_getstr(Cmd, ++i, filename) > 255 ) {
+				PrintAndLog("File name too long");
+				return 1;
+			}
+			break;
+		default:
+			PrintAndLog("Usage:  hf 15 sim  [u UID (16 hex symbols)] [a AFI ] [d DSFID] [e EAS] [m vicc_memory_map.bin]");
+			PrintAndLog("        UID[6] is used as 'IC reference' responsed in Get system information Cmd");
+			PrintAndLog("        Simulate blocks in vicc_memory_map.bin");
+			PrintAndLog("        sample: hf 15 sim 031FEC8AF7FF12E0");
+			return 0;
+		}
 	}
-
-	AFI = param_get8ex(Cmd, 1, 0, 16);
-	DSFID = param_get8ex(Cmd, 2, 0, 16);
-	EAS = param_get8ex(Cmd, 3, 0, 16);
-
-
-	PrintAndLog("--AFI:%02x --DSFID:%02x --EAS:%02x UID:%s", AFI, DSFID, EAS, sprint_hex(UID, 8));
 
 	UsbCommand c = {CMD_SIMTAG_ISO_15693, {AFI, DSFID, EAS}};
 	memcpy(c.d.asBytes, UID, 8);
+
+	FILE *f = fopen(filename, "r");
+	if (!f) {
+		PrintAndLog("couldn't open '%s'", filename);
+		return 0;
+	}
+
+	if( 0x1c != fread(c.d.asBytes + sizeof(UID), 1 + 4, 28, f)) {
+		PrintAndLog("'%s' is malformed, should be 5 bytes(1 security byte + 4 data byte) * 28 blocks", filename);
+		return 2;
+	}
+
+	fclose(f);
+
+
+	PrintAndLog("--AFI:%02x --DSFID:%02x --EAS:%02x UID:%s VICC Memory map:%s", AFI, DSFID, EAS, sprint_hex(UID, 8), filename);
+
 	SendCommand(&c);
 	return 0;
 }

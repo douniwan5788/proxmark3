@@ -1590,16 +1590,27 @@ static void CodeIClassTagAnswer(const uint8_t *cmd, int len)
 	ToSendMax++;
 }
 
-void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
+struct card_memory{
+	uint8_t	 uid[8];
+	struct {
+		uint8_t secStatus;
+		uint8_t data[4];
+	}block[28];
+
+}__attribute__((packed)) ;
+
+void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 {
+	struct card_memory *map = (struct card_memory*)datain;
+
 	// Enable and clear the trace
 	tracing = TRUE;
 	traceLen = 0;
-	memset(trace, 0x44, TRACE_SIZE);
+	memset(trace, 0x44, TRACE_SIZE);	
 
 	// Responses
   	uint8_t cmdRespInventory[] = { /*Flags*/0x00, /*DSFID*/dsfid, /*UID*/0x12, 0x34, 0x56, 0x78, 0x00 ,0x01, 0x04, 0xe0,/*CRC*/ 0x00, 0x00 };
-	memcpy(&cmdRespInventory[2], uid, 8);
+	memcpy(&cmdRespInventory[2], map->uid, 8);
 	AddCrc(cmdRespInventory, sizeof(cmdRespInventory) -2 );
 
 	uint8_t cmdRespGetSystemInfo[] = {
@@ -1616,30 +1627,31 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 	afi, /*AFI*/
 	0x1b, //Number of blocks is on 8 bits, allowing to specify up to 256 blocks. It is one less than the actual number of blocks. 
 	0x03, //Block size is expressed in number of bytes on 5 bits, allowing to specify up to 32 bytes i.e. 256 bits. It is one less than the actual number of bytes.
-	uid[1], //use uid[1] as IC reference
+	map->uid[6], //use uid1 as IC reference
 	0x00, 0x00 /*CRC*/};
-	memcpy(&cmdRespGetSystemInfo[2], uid, 8);
+	memcpy(&cmdRespGetSystemInfo[2], map->uid, 8);
 	AddCrc(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo) -2);
 	
 	uint8_t cmdRespReadSinglBlock[] = { /*Flags*/0x00,/*Data*/0xDE,0xAD,0xBE,0xEF, /*CRC*/ 0x00, 0x00  };
 	AddCrc(cmdRespReadSinglBlock, sizeof(cmdRespReadSinglBlock) -2);
-	
 
 	uint8_t cmdRespReadSinglBlockWithSecStatus[] = { /*Flags*/0x00, /*Block security status*/0x00, /*Data*/0xCA, 0xFE, 0xBA, 0xBE, /*CRC*/ 0x00, 0x00  };
 	AddCrc(cmdRespReadSinglBlockWithSecStatus, sizeof(cmdRespReadSinglBlockWithSecStatus) -2);
 
-	uint8_t cmdRespEASalarm[] = { /*Flags*/0x00,};
+	uint8_t cmdRespEASalarm[] = { /*Flags*/0x00,/*CRC*/ 0x00, 0x00  };
 	AddCrc(cmdRespEASalarm, sizeof(cmdRespEASalarm) -2);
 
 	uint8_t cmdRespError[] = { /*Flags*/0x00, /*error code*/0x0F, /*CRC*/ 0x00, 0x00  };
 	AddCrc(cmdRespError, sizeof(cmdRespError) -2);
 
-	uint8_t cmdResp6[] = { /*Flags*/0x00, /*CRC*/ 0x00, 0x00  };
-	AddCrc(cmdResp6, sizeof(cmdResp6) -2);
+	uint8_t cmdRespMulBlockSecStatus[1 + 28 + 2] = { /*Flags*/0x00};
+	for (int i = 0; i<28; ++i) {
+		cmdRespMulBlockSecStatus[1+i] = map->block[i].secStatus;
+	}
+	AddCrc(cmdRespMulBlockSecStatus, sizeof(cmdRespMulBlockSecStatus) -2);
 
 	uint8_t cmdResp7[] = { /*Flags*/0x00, /*CRC*/ 0x00, 0x00  };
 	AddCrc(cmdResp7, sizeof(cmdResp7) -2);
-
 
 	uint8_t *resp;
 	int respLen;
@@ -1692,17 +1704,28 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 	memcpy(respError, ToSend, ToSendMax); respErrorLen = ToSendMax;
 
 	//
-	uint8_t *resp6 = (respError + ToSendMax +5 );
-	int resp6Len;
-	CodeIClassTagAnswer(cmdResp6, sizeof(cmdResp6));
-	memcpy(resp6, ToSend, ToSendMax); resp6Len = ToSendMax;
+	uint8_t *respMulBlockSecStatus = (respError + ToSendMax +5 );
+	int respMulBlockSecStatusLen;
+	CodeIClassTagAnswer(cmdRespMulBlockSecStatus, sizeof(cmdRespMulBlockSecStatus));
+	memcpy(respMulBlockSecStatus, ToSend, ToSendMax); respMulBlockSecStatusLen = ToSendMax;
 
 	//
-	uint8_t *resp7 = (resp6 + ToSendMax +5 );
+	uint8_t *resp7 = (respMulBlockSecStatus + ToSendMax +5 );
 	int resp7Len;
 	CodeIClassTagAnswer(cmdResp7, sizeof(cmdResp7));
 	memcpy(resp7, ToSend, ToSendMax); resp7Len = ToSendMax;
 
+
+	uint8_t cmdRespReadBlockFromMap[] = { /*Flags*/0x00,/*data*/ 0x00, 0x00, 0x00, 0x00, /*CRC*/ 0x00, 0x00  };
+	uint8_t *respReadBlockFromMap = (resp7 + ToSendMax +5 );
+	
+	for (int i = 0; i<28; ++i) {
+		memcpy(&cmdRespReadBlockFromMap[1], map->block[i].data, 4);
+		AddCrc(cmdRespReadBlockFromMap, sizeof(cmdRespReadBlockFromMap) -2);
+		CodeIClassTagAnswer(cmdRespReadBlockFromMap, sizeof(cmdRespReadBlockFromMap));
+		memcpy(&respReadBlockFromMap[i*ToSendMax], ToSend, ToSendMax);
+	}
+	int respReadBlockFromMapLen = ToSendMax;
 
 	// + 1720..
   uint8_t *receivedCmd = (((uint8_t *)BigBuf) + RECV_CMD_OFFSET);
@@ -1715,6 +1738,7 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 
 	// To control where we are in the protocol
 	int cmdsRecvd = 0;
+	int uidLen = 0;
 
 	LED_A_ON();
 	for(;;) {
@@ -1724,6 +1748,7 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 			break;
 		}
 
+		uidLen = 8 * !!(receivedCmd[0] & ISO15_REQ_ADDRESS);
 		// Okay, look at the command now.
 		if(len > 2 && receivedCmd[1] == 0x01) {
 		// Inventory Request
@@ -1745,10 +1770,19 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 		        respdata = cmdRespReadSinglBlockWithSecStatus;
 		        respsize = sizeof(cmdRespReadSinglBlockWithSecStatus);
 			} else {
-				resp = respReadSingleBlock; respLen = respReadSingleBlockLen;
-		        respdata = cmdRespReadSinglBlock;
-		        respsize = sizeof(cmdRespReadSinglBlock);
-	        }
+				if (receivedCmd[1 + uidLen +1] < 28 ){
+					// return block in map;
+					resp = &respReadBlockFromMap[respReadBlockFromMapLen * receivedCmd[1 + uidLen +1]];
+					respLen = respReadBlockFromMapLen;
+			        respdata = (uint8_t*)&map->block[receivedCmd[1 + uidLen +1]];
+			        respsize = 5;
+		        } else {
+		        	// return default 'blank' block;
+		        	resp = respReadSingleBlock; respLen = respReadSingleBlockLen;
+			        respdata = cmdRespReadSinglBlock;
+			        respsize = sizeof(cmdRespReadSinglBlock);
+		        }
+		    }
 	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
 			// Get System Information Request
 			resp = respEASalarm; respLen = respEASalarmLen;
@@ -1758,10 +1792,10 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 			resp = respError; respLen = respErrorLen;
 	        respdata = cmdRespError;
 	        respsize = sizeof(cmdRespError);
-	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
-			resp = resp6; respLen = resp6Len;
-	        respdata = cmdResp6;
-	        respsize = sizeof(cmdResp6);
+	    } else if(len == 14 && receivedCmd[1] == 0x2c && receivedCmd[1 +uidLen + 2] == 0x1b) {	
+			resp = respMulBlockSecStatus; respLen = respMulBlockSecStatusLen;
+	        respdata = cmdRespMulBlockSecStatus;
+	        respsize = sizeof(cmdRespMulBlockSecStatus);
 	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
 			resp = resp7; respLen = resp7Len;
 	        respdata = cmdResp7;
@@ -1796,8 +1830,10 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 		// receivedCmd[0], receivedCmd[1], receivedCmd[2],
 		// receivedCmd[3], receivedCmd[4], receivedCmd[5],
 		// receivedCmd[6], receivedCmd[7], receivedCmd[8]);
-		Dbprintf("received from reader (len=%d):");
-		Dbhexdump(len,receivedCmd,false);
+		if (DEBUG) {
+			Dbprintf("received from reader (len=%d):",len);
+			Dbhexdump(len,receivedCmd,false);	
+		}
 
 		if (tracing) {
 			LogTrace(receivedCmd,len, rsamples, Uart.parityBits, TRUE);
