@@ -276,7 +276,7 @@ int CmdHF15Reader(const char *Cmd)
 int CmdHF15Sim(const char *Cmd)
 {
 	uint8_t AFI = 0, DSFID = 0, EAS = 0;
-	uint8_t UID[8] = {0, 0, 0, 0, 0, 0, 0, 0xE0};
+	uint8_t UID[8] = {0, 0, 0, 0, 0, 0x01, 0x04, 0xE0};
 
 	if (param_getchar(Cmd, 0) == 'h') {
 		PrintAndLog("Usage:  hf 15 sim  [UID (16 hex symbols) [AFI [DSFID [EAS]]]]");

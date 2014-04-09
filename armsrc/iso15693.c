@@ -1592,16 +1592,17 @@ static void CodeIClassTagAnswer(const uint8_t *cmd, int len)
 
 void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 {
-	// uint8_t simType = arg0;
-
-  // Enable and clear the trace
+	// Enable and clear the trace
 	tracing = TRUE;
 	traceLen = 0;
-  memset(trace, 0x44, TRACE_SIZE);
+	memset(trace, 0x44, TRACE_SIZE);
 
 	// Responses
-  	uint8_t responseInventory[] = { /*Flags*/0x00, /*DSFID*/0x00, /*UID*/0x12, 0x34, 0x56, 0x78, 0x00 ,0x01, 0x04, 0xe0,/*CRC*/ 0x00, 0x00 };
-	uint8_t responseGetSystemInfo[] = {
+  	uint8_t cmdRespInventory[] = { /*Flags*/0x00, /*DSFID*/dsfid, /*UID*/0x12, 0x34, 0x56, 0x78, 0x00 ,0x01, 0x04, 0xe0,/*CRC*/ 0x00, 0x00 };
+	memcpy(&cmdRespInventory[2], uid, 8);
+	AddCrc(cmdRespInventory, sizeof(cmdRespInventory) -2 );
+
+	uint8_t cmdRespGetSystemInfo[] = {
 	0x00, //Flags
 	0x0F, /*info Flags	b1 DSFID present
 						b2 AFI present
@@ -1617,20 +1618,27 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 	0x03, //Block size is expressed in number of bytes on 5 bits, allowing to specify up to 32 bytes i.e. 256 bits. It is one less than the actual number of bytes.
 	uid[1], //use uid[1] as IC reference
 	0x00, 0x00 /*CRC*/};
+	memcpy(&cmdRespGetSystemInfo[2], uid, 8);
+	AddCrc(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo) -2);
+	
+	uint8_t cmdRespReadSinglBlock[] = { /*Flags*/0x00,/*Data*/0xDE,0xAD,0xBE,0xEF, /*CRC*/ 0x00, 0x00  };
+	AddCrc(cmdRespReadSinglBlock, sizeof(cmdRespReadSinglBlock) -2);
 	
 
-	// uint8_t responseReadSingleBlock[] = { 0x00 };
-	// uint8_t response3[] = { 0x00 };
-	// uint8_t response4[] = { 0x00 };
+	uint8_t cmdRespReadSinglBlockWithSecStatus[] = { /*Flags*/0x00, /*Block security status*/0x00, /*Data*/0xCA, 0xFE, 0xBA, 0xBE, /*CRC*/ 0x00, 0x00  };
+	AddCrc(cmdRespReadSinglBlockWithSecStatus, sizeof(cmdRespReadSinglBlockWithSecStatus) -2);
 
-	// Use the UID from commandline
-	memcpy(&responseInventory[2], uid, 8);
-	memcpy(&responseGetSystemInfo[2], uid, 8);
+	uint8_t cmdRespEASalarm[] = { /*Flags*/0x00,};
+	AddCrc(cmdRespEASalarm, sizeof(cmdRespEASalarm) -2);
 
-	// Compute CRC
-	AddCrc(responseInventory, sizeof(responseInventory) -2 );
-	AddCrc(responseGetSystemInfo, sizeof(responseGetSystemInfo) -2);
-	
+	uint8_t cmdRespError[] = { /*Flags*/0x00, /*error code*/0x0F, /*CRC*/ 0x00, 0x00  };
+	AddCrc(cmdRespError, sizeof(cmdRespError) -2);
+
+	uint8_t cmdResp6[] = { /*Flags*/0x00, /*CRC*/ 0x00, 0x00  };
+	AddCrc(cmdResp6, sizeof(cmdResp6) -2);
+
+	uint8_t cmdResp7[] = { /*Flags*/0x00, /*CRC*/ 0x00, 0x00  };
+	AddCrc(cmdResp7, sizeof(cmdResp7) -2);
 
 
 	uint8_t *resp;
@@ -1646,36 +1654,54 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 	uint8_t *respInventory = (((uint8_t *)BigBuf) + FREE_BUFFER_OFFSET);
 	int respInventoryLen;
 	// Build a suitable reponse to the reader INVENTORY cocmmand
-	CodeIClassTagAnswer(responseInventory, sizeof(responseInventory));
+	CodeIClassTagAnswer(cmdRespInventory, sizeof(cmdRespInventory));
 	memcpy(respInventory, ToSend, ToSendMax); respInventoryLen = ToSendMax;
 
-// 	// Respond SOF -- takes 8 bytes
-// 	uint8_t *respGetSystemInfo = (respInventory + ToSendMax +5 );
-// 	int respGetSystemInfoLen;
-// 	// Get System Info
-// 	CodeIClassTagAnswer(responseGetSystemInfo, sizeof(responseGetSystemInfo));
-// 	memcpy(respGetSystemInfo, ToSend, ToSendMax); respGetSystemInfoLen = ToSendMax;
+	// Respond SOF -- takes 8 bytes
+	uint8_t *respGetSystemInfo = (respInventory + ToSendMax +5 );
+	int respGetSystemInfoLen;
+	// Get System Info
+	CodeIClassTagAnswer(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo));
+	memcpy(respGetSystemInfo, ToSend, ToSendMax); respGetSystemInfoLen = ToSendMax;
 
-// // ReadSingleBlock
-// 	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
-// 	uint8_t *respReadSingleBlock = (respGetSystemInfo + ToSendMax +5 );
-// 	int respReadSingleBlockLen;
-// 	CodeIClassTagAnswer(responseReadSingleBlock, sizeof(responseReadSingleBlock));
-// 	memcpy(respReadSingleBlock, ToSend, ToSendMax); respReadSingleBlockLen = ToSendMax;
-
-	
-// 	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
-// 	uint8_t *resp3 = (respReadSingleBlock + ToSendMax +5 );
-// 	int resp3Len;
-// 	CodeIClassTagAnswer(response3, sizeof(response3));
-// 	memcpy(resp3, ToSend, ToSendMax); resp3Len = ToSendMax;
+// ReadSingleBlock
+	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
+	uint8_t *respReadSingleBlock = (respGetSystemInfo + ToSendMax +5 );
+	int respReadSingleBlockLen;
+	CodeIClassTagAnswer(cmdRespReadSinglBlock, sizeof(cmdRespReadSinglBlock));
+	memcpy(respReadSingleBlock, ToSend, ToSendMax); respReadSingleBlockLen = ToSendMax;
 
 	
-// 	// 144: Takes 16 bytes for SOF/EOF and 8 * 16 = 128 bytes (2 bytes/bit)
-// 	uint8_t *resp4 = (resp3 + ToSendMax +5 );
-// 	int resp4Len;
-// 		CodeIClassTagAnswer(response4, sizeof(response4));
-// 	memcpy(resp4, ToSend, ToSendMax); resp4Len = ToSendMax;
+	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
+	uint8_t *resp3 = (respReadSingleBlock + ToSendMax +5 );
+	int resp3Len;
+	CodeIClassTagAnswer(cmdRespReadSinglBlockWithSecStatus, sizeof(cmdRespReadSinglBlockWithSecStatus));
+	memcpy(resp3, ToSend, ToSendMax); resp3Len = ToSendMax;
+
+	
+	//
+	uint8_t *respEASalarm = (resp3 + ToSendMax +5 );
+	int respEASalarmLen;
+	CodeIClassTagAnswer(cmdRespEASalarm, sizeof(cmdRespEASalarm));
+	memcpy(respEASalarm, ToSend, ToSendMax); respEASalarmLen = ToSendMax;
+
+	//
+	uint8_t *respError = (respEASalarm + ToSendMax +5 );
+	int respErrorLen;
+	CodeIClassTagAnswer(cmdRespError, sizeof(cmdRespError));
+	memcpy(respError, ToSend, ToSendMax); respErrorLen = ToSendMax;
+
+	//
+	uint8_t *resp6 = (respError + ToSendMax +5 );
+	int resp6Len;
+	CodeIClassTagAnswer(cmdResp6, sizeof(cmdResp6));
+	memcpy(resp6, ToSend, ToSendMax); resp6Len = ToSendMax;
+
+	//
+	uint8_t *resp7 = (resp6 + ToSendMax +5 );
+	int resp7Len;
+	CodeIClassTagAnswer(cmdResp7, sizeof(cmdResp7));
+	memcpy(resp7, ToSend, ToSendMax); resp7Len = ToSendMax;
 
 
 	// + 1720..
@@ -1702,30 +1728,44 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 		if(len > 2 && receivedCmd[1] == 0x01) {
 		// Inventory Request
 	        resp = respInventory; respLen = respInventoryLen;
-	        respdata = responseInventory;
-	        respsize = sizeof(responseInventory);
-	        Dbhexdump(respsize,respdata,false);
-	        Dbhexdump(respLen,resp,false);
-		// } else if(len > 2 && receivedCmd[1] == 0x2B) {
-		// 	// Get System Information Request
-		// 	resp = respGetSystemInfo; respLen = respGetSystemInfoLen;
-	 //        respdata = responseGetSystemInfo;
-	 //        respsize = sizeof(responseGetSystemInfo);
-  //       } else if(len > 2 && receivedCmd[1] == 0x20) {
-		// 	// Read Single Block Request
-		// 	resp = respReadSingleBlock; respLen = respReadSingleBlockLen;
-	 //        respdata = responseReadSingleBlock;
-	 //        respsize = sizeof(responseReadSingleBlock);
-	 //    } else if(len > 2 && receivedCmd[1] == 0x23) {	
-		// 	// Get System Information Request
-		// 	resp = resp3; respLen = resp3Len;
-	 //        respdata = response3;
-	 //        respsize = sizeof(response3);
-	 //    } else if(len > 2 && receivedCmd[1] == 0x00) {	
-		// 	// Get System Information Request
-		// 	resp = resp4; respLen = resp4Len;
-	 //        respdata = response4;
-	 //        respsize = sizeof(response4);
+	        respdata = cmdRespInventory;
+	        respsize = sizeof(cmdRespInventory);
+	        // Dbhexdump(respsize,respdata,false);			//never use Dbhexdump in here,will case timeout!!
+	        // Dbhexdump(respLen,resp,false);
+		} else if(len > 2 && receivedCmd[1] == 0x2B) {
+			// Get System Information Request
+			resp = respGetSystemInfo; respLen = respGetSystemInfoLen;
+	        respdata = cmdRespGetSystemInfo;
+	        respsize = sizeof(cmdRespGetSystemInfo);
+        } else if(len > 2 && receivedCmd[1] == 0x20) {
+			// Read Single Block Request
+			if(receivedCmd[0] & ISO15_REQ_OPTION) {
+				// request block security status
+				resp = resp3; respLen = resp3Len;
+		        respdata = cmdRespReadSinglBlockWithSecStatus;
+		        respsize = sizeof(cmdRespReadSinglBlockWithSecStatus);
+			} else {
+				resp = respReadSingleBlock; respLen = respReadSingleBlockLen;
+		        respdata = cmdRespReadSinglBlock;
+		        respsize = sizeof(cmdRespReadSinglBlock);
+	        }
+	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
+			// Get System Information Request
+			resp = respEASalarm; respLen = respEASalarmLen;
+	        respdata = cmdRespEASalarm;
+	        respsize = sizeof(cmdRespEASalarm);
+	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
+			resp = respError; respLen = respErrorLen;
+	        respdata = cmdRespError;
+	        respsize = sizeof(cmdRespError);
+	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
+			resp = resp6; respLen = resp6Len;
+	        respdata = cmdResp6;
+	        respsize = sizeof(cmdResp6);
+	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
+			resp = resp7; respLen = resp7Len;
+	        respdata = cmdResp7;
+	        respsize = sizeof(cmdResp7);
 		} else {
 			// Never seen this command before
 			Dbprintf("Unknown command received from reader (len=%d): %x %x %x %x %x %x %x %x %x",
@@ -1734,9 +1774,9 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 			receivedCmd[3], receivedCmd[4], receivedCmd[5],
 			receivedCmd[6], receivedCmd[7], receivedCmd[8]);
 			// Do not respond
-			resp = NULL; respLen = 0; //order = 0;
-			respdata = NULL;
-			respsize = 0;
+			resp = respError; respLen = respErrorLen; //order = 0;
+			respdata = cmdRespError;
+			respsize = sizeof(cmdRespError);
 		}
 
 		if(cmdsRecvd > 999) {
@@ -1751,12 +1791,14 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *uid)
 			SendIClassAnswer(resp, respLen, 0);
 		}
 
-		Dbprintf("received from reader (len=%d): %x %x %x %x %x %x %x %x %x",
-		len,
-		receivedCmd[0], receivedCmd[1], receivedCmd[2],
-		receivedCmd[3], receivedCmd[4], receivedCmd[5],
-		receivedCmd[6], receivedCmd[7], receivedCmd[8]);
-		
+		// Dbprintf("received from reader (len=%d): %x %x %x %x %x %x %x %x %x",
+		// len,
+		// receivedCmd[0], receivedCmd[1], receivedCmd[2],
+		// receivedCmd[3], receivedCmd[4], receivedCmd[5],
+		// receivedCmd[6], receivedCmd[7], receivedCmd[8]);
+		Dbprintf("received from reader (len=%d):");
+		Dbhexdump(len,receivedCmd,false);
+
 		if (tracing) {
 			LogTrace(receivedCmd,len, rsamples, Uart.parityBits, TRUE);
 			if (respdata != NULL) {
