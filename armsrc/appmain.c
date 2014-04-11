@@ -36,7 +36,7 @@
 // is the order in which they go out on the wire.
 //=============================================================================
 
-uint8_t ToSend[512];
+uint8_t ToSend[2256];
 int ToSendMax;
 static int ToSendBit;
 struct common_area common_area __attribute__((section(".commonarea")));

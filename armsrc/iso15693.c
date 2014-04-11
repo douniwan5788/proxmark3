@@ -1498,10 +1498,12 @@ void ReaderIso15693(uint32_t parameter)
 // 	LED_C_OFF();
 // 	LED_D_OFF();
 // }
-static int SendIClassAnswer(uint8_t *resp, int respLen, int delay)
+static int SendIso15693Answer(uint8_t *resp, int respLen, int delay)
 {
-	int i = 0, u = 0, d = 0;
+	int i = 0, u = 0, d = 0, j = 0, sendbyte = 0, sendbit = 0;
 	uint8_t b = 0;
+	uint8_t sof[] = {0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0xff };
+	uint8_t eof[] = {0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00 };
 	// return 0;
 	// Modulate Manchester
 	// FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD423);
@@ -1509,7 +1511,7 @@ static int SendIClassAnswer(uint8_t *resp, int respLen, int delay)
 	AT91C_BASE_SSC->SSC_THR = 0x00;
 	FpgaSetupSsc();
 	
-	// send cycle
+	// send sof
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
@@ -1519,12 +1521,65 @@ static int SendIClassAnswer(uint8_t *resp, int respLen, int delay)
 			if(d < delay) {
 				b = 0x00;
 				d++;
+			} else if(i >= 8) {
+				break;
+			} else {				
+				b = sof[i];
+				u++;
+				if(u > 1) { i++; u = 0; }
 			}
-			else if(i >= respLen) {
+			AT91C_BASE_SSC->SSC_THR = b;
+		}
+	}
+
+	i = 0, u = 0;
+	// send cycle
+	sendbyte = resp[0];
+	for(;;) {
+		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
+			volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+			(void)b;
+		}
+		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
+			if(i >= respLen) {
+				break;
+			} else {
+				sendbit = (sendbyte >>(j>>1)) & 1;
+
+				b = sendbit ^ (j&1) ? 0x00:0xff;
+
+				u++;
+				if(u > 1) {
+					u = 0; 
+					if (++j == 16) {
+						j=0;
+						i++;
+						sendbyte = resp[i];
+					}
+				}
+			}
+			AT91C_BASE_SSC->SSC_THR = b;
+
+			if(u > 4) break;
+		}
+		if(BUTTON_PRESS()) {
+			return 1;
+		}
+	}
+
+	i = 0, u = 0;
+	// send eof
+	for(;;) {
+		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
+			volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+			(void)b;
+		}
+		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
+			if(i >= 8) {
 				b = 0x00;
 				u++;
 			} else {
-				b = resp[i];
+				b = eof[i];
 				u++;
 				if(u > 1) { i++; u = 0; }
 			}
@@ -1532,18 +1587,53 @@ static int SendIClassAnswer(uint8_t *resp, int respLen, int delay)
 
 			if(u > 4) break;
 		}
-		if(BUTTON_PRESS()) {
-			break;
-		}
 	}
+
 
 	return 0;
 }
 
+// // Only SOF 
+// static void CodeIso15693TagSOF()
+// {
+// 	ToSendReset();
+
+// 	// Send SOF
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0xff;
+	
+// 	// Convert from last byte pos to length
+// 	ToSendMax++;
+// }
+// // Only EOF 
+// static void CodeIso15693TagEOF()
+// {
+// 	ToSendReset();
+
+// 	// Send EOF
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0x00;
+	
+// 	// Convert from last byte pos to length
+// 	ToSendMax++;
+// }
+
 //-----------------------------------------------------------------------------
 // Prepare tag messages
 //-----------------------------------------------------------------------------
-static void CodeIClassTagAnswer(const uint8_t *cmd, int len)
+static void CodeIso15693TagAnswer(const uint8_t *cmd, int len)
 {
 	int i;
 
@@ -1638,8 +1728,8 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 	uint8_t cmdRespReadSinglBlockWithSecStatus[] = { /*Flags*/0x00, /*Block security status*/0x00, /*Data*/0xCA, 0xFE, 0xBA, 0xBE, /*CRC*/ 0x00, 0x00  };
 	AddCrc(cmdRespReadSinglBlockWithSecStatus, sizeof(cmdRespReadSinglBlockWithSecStatus) -2);
 
-	uint8_t cmdRespEASalarm[] = { /*Flags*/0x00,/*CRC*/ 0x00, 0x00  };
-	AddCrc(cmdRespEASalarm, sizeof(cmdRespEASalarm) -2);
+	uint8_t cmdRespOK[] = { /*Flags*/0x00,/*CRC*/ 0x00, 0x00  };
+	AddCrc(cmdRespOK, sizeof(cmdRespOK) -2);
 
 	uint8_t cmdRespError[] = { /*Flags*/0x00, /*error code*/0x0F, /*CRC*/ 0x00, 0x00  };
 	AddCrc(cmdRespError, sizeof(cmdRespError) -2);
@@ -1650,8 +1740,11 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 	}
 	AddCrc(cmdRespMulBlockSecStatus, sizeof(cmdRespMulBlockSecStatus) -2);
 
-	uint8_t cmdResp7[] = { /*Flags*/0x00, /*CRC*/ 0x00, 0x00  };
-	AddCrc(cmdResp7, sizeof(cmdResp7) -2);
+	uint8_t cmdRespReadMulBlock[1 + 28*5 +2] = { /*Flags*/0x00};
+	for (int i = 0; i<28; ++i) {
+		memcpy(&cmdRespReadMulBlock[1+i*4], &map->block[i].data, 4);
+	}
+	AddCrc(cmdRespReadMulBlock, sizeof(cmdRespReadMulBlock) -2);
 
 	uint8_t *resp;
 	int respLen;
@@ -1666,66 +1759,74 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 	uint8_t *respInventory = (((uint8_t *)BigBuf) + FREE_BUFFER_OFFSET);
 	int respInventoryLen;
 	// Build a suitable reponse to the reader INVENTORY cocmmand
-	CodeIClassTagAnswer(cmdRespInventory, sizeof(cmdRespInventory));
+	CodeIso15693TagAnswer(cmdRespInventory, sizeof(cmdRespInventory));
 	memcpy(respInventory, ToSend, ToSendMax); respInventoryLen = ToSendMax;
+	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax);
 
 	// Respond SOF -- takes 8 bytes
-	uint8_t *respGetSystemInfo = (respInventory + ToSendMax +5 );
+	uint8_t *respGetSystemInfo = (respInventory + ToSendMax );
 	int respGetSystemInfoLen;
 	// Get System Info
-	CodeIClassTagAnswer(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo));
+	CodeIso15693TagAnswer(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo));
 	memcpy(respGetSystemInfo, ToSend, ToSendMax); respGetSystemInfoLen = ToSendMax;
-
+	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 // ReadSingleBlock
 	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
-	uint8_t *respReadSingleBlock = (respGetSystemInfo + ToSendMax +5 );
+	uint8_t *respReadSingleBlock = (respGetSystemInfo + ToSendMax );
 	int respReadSingleBlockLen;
-	CodeIClassTagAnswer(cmdRespReadSinglBlock, sizeof(cmdRespReadSinglBlock));
+	CodeIso15693TagAnswer(cmdRespReadSinglBlock, sizeof(cmdRespReadSinglBlock));
 	memcpy(respReadSingleBlock, ToSend, ToSendMax); respReadSingleBlockLen = ToSendMax;
+	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
 	
 	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
-	uint8_t *resp3 = (respReadSingleBlock + ToSendMax +5 );
+	uint8_t *resp3 = (respReadSingleBlock + ToSendMax );
 	int resp3Len;
-	CodeIClassTagAnswer(cmdRespReadSinglBlockWithSecStatus, sizeof(cmdRespReadSinglBlockWithSecStatus));
+	CodeIso15693TagAnswer(cmdRespReadSinglBlockWithSecStatus, sizeof(cmdRespReadSinglBlockWithSecStatus));
 	memcpy(resp3, ToSend, ToSendMax); resp3Len = ToSendMax;
-
+	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 	
 	//
-	uint8_t *respEASalarm = (resp3 + ToSendMax +5 );
-	int respEASalarmLen;
-	CodeIClassTagAnswer(cmdRespEASalarm, sizeof(cmdRespEASalarm));
-	memcpy(respEASalarm, ToSend, ToSendMax); respEASalarmLen = ToSendMax;
+	uint8_t *respOK = (resp3 + ToSendMax );
+	int respOKLen;
+	CodeIso15693TagAnswer(cmdRespOK, sizeof(cmdRespOK));
+	memcpy(respOK, ToSend, ToSendMax); respOKLen = ToSendMax;
+	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
 	//
-	uint8_t *respError = (respEASalarm + ToSendMax +5 );
+	uint8_t *respError = (respOK + ToSendMax );
 	int respErrorLen;
-	CodeIClassTagAnswer(cmdRespError, sizeof(cmdRespError));
+	CodeIso15693TagAnswer(cmdRespError, sizeof(cmdRespError));
 	memcpy(respError, ToSend, ToSendMax); respErrorLen = ToSendMax;
+	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
 	//
-	uint8_t *respMulBlockSecStatus = (respError + ToSendMax +5 );
+	uint8_t *respMulBlockSecStatus = (respError + ToSendMax );
 	int respMulBlockSecStatusLen;
-	CodeIClassTagAnswer(cmdRespMulBlockSecStatus, sizeof(cmdRespMulBlockSecStatus));
+	CodeIso15693TagAnswer(cmdRespMulBlockSecStatus, sizeof(cmdRespMulBlockSecStatus));
 	memcpy(respMulBlockSecStatus, ToSend, ToSendMax); respMulBlockSecStatusLen = ToSendMax;
+	if (DEBUG) Dbprintf("cmdRespMulBlockSecStatus Bigbuf Used : %d",ToSendMax );
 
 	//
-	uint8_t *resp7 = (respMulBlockSecStatus + ToSendMax +5 );
-	int resp7Len;
-	CodeIClassTagAnswer(cmdResp7, sizeof(cmdResp7));
-	memcpy(resp7, ToSend, ToSendMax); resp7Len = ToSendMax;
+	// uint8_t *respReadMulBlock = (respMulBlockSecStatus + ToSendMax );
+	uint8_t *respReadMulBlock = (respGetSystemInfo);
+	int respReadMulBlockLen;
+	CodeIso15693TagAnswer(cmdRespReadMulBlock, sizeof(cmdRespReadMulBlock));
+	memcpy(respReadMulBlock, ToSend, ToSendMax); respReadMulBlockLen = ToSendMax;
+	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
 
 	uint8_t cmdRespReadBlockFromMap[] = { /*Flags*/0x00,/*data*/ 0x00, 0x00, 0x00, 0x00, /*CRC*/ 0x00, 0x00  };
-	uint8_t *respReadBlockFromMap = (resp7 + ToSendMax +5 );
+	uint8_t *respReadBlockFromMap = (respReadMulBlock + ToSendMax );
 	
 	for (int i = 0; i<28; ++i) {
 		memcpy(&cmdRespReadBlockFromMap[1], map->block[i].data, 4);
 		AddCrc(cmdRespReadBlockFromMap, sizeof(cmdRespReadBlockFromMap) -2);
-		CodeIClassTagAnswer(cmdRespReadBlockFromMap, sizeof(cmdRespReadBlockFromMap));
+		CodeIso15693TagAnswer(cmdRespReadBlockFromMap, sizeof(cmdRespReadBlockFromMap));
 		memcpy(&respReadBlockFromMap[i*ToSendMax], ToSend, ToSendMax);
 	}
 	int respReadBlockFromMapLen = ToSendMax;
+	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
 	// + 1720..
   uint8_t *receivedCmd = (((uint8_t *)BigBuf) + RECV_CMD_OFFSET);
@@ -1783,23 +1884,26 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 			        respsize = sizeof(cmdRespReadSinglBlock);
 		        }
 		    }
-	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
-			// Get System Information Request
-			resp = respEASalarm; respLen = respEASalarmLen;
-	        respdata = cmdRespEASalarm;
-	        respsize = sizeof(cmdRespEASalarm);
+	    } else if(len > 2 && receivedCmd[1] == 0x22) {	
+			// Lock Block
+			/*Now just return ok,maybe we should change the security block in map too*/
+			resp = respOK; respLen = respOKLen;
+	        respdata = cmdRespOK;
+	        respsize = sizeof(cmdRespOK);
 	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
 			resp = respError; respLen = respErrorLen;
 	        respdata = cmdRespError;
 	        respsize = sizeof(cmdRespError);
-	    } else if(len == 14 && receivedCmd[1] == 0x2c && receivedCmd[1 +uidLen + 2] == 0x1b) {	
+	    } else if(len > 2 && receivedCmd[1] == 0x2c && receivedCmd[1 +uidLen + 1] == 0x00 && receivedCmd[1 +uidLen + 2] >= 0x1b) {	
+	    	//  Get multiple block security status 
 			resp = respMulBlockSecStatus; respLen = respMulBlockSecStatusLen;
 	        respdata = cmdRespMulBlockSecStatus;
 	        respsize = sizeof(cmdRespMulBlockSecStatus);
-	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
-			resp = resp7; respLen = resp7Len;
-	        respdata = cmdResp7;
-	        respsize = sizeof(cmdResp7);
+	    } else if(len > 2 && receivedCmd[1] == 0x23 && !(receivedCmd[0] & ISO15_REQ_OPTION)
+	    	&& receivedCmd[1 +uidLen + 1] == 0x00 && receivedCmd[1 +uidLen + 2] >= 0x1b) {	
+			resp = respReadMulBlock; respLen = respReadMulBlockLen;
+	        respdata = cmdRespReadMulBlock;
+	        respsize = sizeof(cmdRespReadMulBlock);
 		} else {
 			// Never seen this command before
 			Dbprintf("Unknown command received from reader (len=%d): %x %x %x %x %x %x %x %x %x",
@@ -1821,8 +1925,11 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 			cmdsRecvd++;
 		}
 
+		//DEBUG/////////
+		resp = respdata; respLen= respsize;
+		//DEBUG/////////
 		if(respLen > 0) {
-			SendIClassAnswer(resp, respLen, 0);
+			SendIso15693Answer(resp, respLen, 0);
 		}
 
 		// Dbprintf("received from reader (len=%d): %x %x %x %x %x %x %x %x %x",

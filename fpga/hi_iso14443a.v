@@ -571,6 +571,30 @@ assign ssp_din = bit_to_arm;
 wire sub_carrier;
 assign sub_carrier = ~sub_carrier_cnt[4];
 
+
+wire sub_carrier2;
+reg [4:0] sub_carrier_cnt2
+always @(negedge adc_clk)
+begin
+    if(mod_type == `TAGSIM_MODFSK && mod_sig_coil == 1'b0 )
+        if(sub_carrier_cnt2 = 4'd???)
+        begin
+            sub_carrier_cnt2 <= 0;
+            sub_carrier2 <= ~sub_carrier2;
+        end
+        else
+            sub_carrier_cnt2 <= sub_carrier_cnt2 +1;
+    else
+    begin
+        sub_carrier_cnt2 <= 0;
+        sub_carrier2 <= 0;
+    end
+end
+
+
+assign sub_carrier2 = (mod_type == `TAGSIM_MODFSK) & ~sub_carrier_cnt[4];
+
+
 // in READER_MOD: drop carrier for mod_sig_coil==1 (pause); in READER_LISTEN: carrier always on; in other modes: carrier always off
 assign pwr_hi = (ck_1356megb & (((mod_type == `READER_MOD) & ~mod_sig_coil) || (mod_type == `READER_LISTEN)));
 
@@ -582,7 +606,7 @@ assign pwr_oe3 = 1'b0;
 // TAGSIM_MOD: short circuit antenna with different resistances (modulated by sub_carrier modulated by mod_sig_coil)
 // for pwr_oe4 = 1 (tristate): antenna load = 10k || 33			= 32,9 Ohms
 // for pwr_oe4 = 0 (active):   antenna load = 10k || 33 || 33  	= 16,5 Ohms
-assign pwr_oe4 = ~(mod_sig_coil & sub_carrier & (mod_type == `TAGSIM_MOD));
+assign pwr_oe4 = ~( (mod_sig_coil & sub_carrier | ~mod_sig_coil & sub_carrier2) & (mod_type == `TAGSIM_MOD));
 
 // This is all LF, so doesn't matter.
 assign pwr_oe2 = 1'b0;
