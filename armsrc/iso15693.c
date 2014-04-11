@@ -1630,55 +1630,55 @@ static int SendIso15693Answer(uint8_t *resp, int respLen, int delay)
 // 	ToSendMax++;
 // }
 
-//-----------------------------------------------------------------------------
-// Prepare tag messages
-//-----------------------------------------------------------------------------
-static void CodeIso15693TagAnswer(const uint8_t *cmd, int len)
-{
-	int i;
+// //-----------------------------------------------------------------------------
+// // Prepare tag messages
+// //-----------------------------------------------------------------------------
+// static void CodeIso15693TagAnswer(const uint8_t *cmd, int len)
+// {
+// 	int i;
 
-	ToSendReset();
+// 	ToSendReset();
 
-	// Send SOF
-	ToSend[++ToSendMax] = 0x00;
-	ToSend[++ToSendMax] = 0x00;
-	ToSend[++ToSendMax] = 0x00;
-	ToSend[++ToSendMax] = 0xff;
-	ToSend[++ToSendMax] = 0xff;
-	ToSend[++ToSendMax] = 0xff;
-	ToSend[++ToSendMax] = 0x00;
-	ToSend[++ToSendMax] = 0xff;
+// 	// Send SOF
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0xff;
 
-	for(i = 0; i < len; i++) {
-		int j;
-		uint8_t b = cmd[i];
+// 	for(i = 0; i < len; i++) {
+// 		int j;
+// 		uint8_t b = cmd[i];
 
-		// Data bits
-		for(j = 0; j < 8; j++) {
-			if(b & 1) {
-				ToSend[++ToSendMax] = 0x00;
-				ToSend[++ToSendMax] = 0xff;
-			} else {
-				ToSend[++ToSendMax] = 0xff;
-				ToSend[++ToSendMax] = 0x00;
-			}
-			b >>= 1;
-		}
-	}
+// 		// Data bits
+// 		for(j = 0; j < 8; j++) {
+// 			if(b & 1) {
+// 				ToSend[++ToSendMax] = 0x00;
+// 				ToSend[++ToSendMax] = 0xff;
+// 			} else {
+// 				ToSend[++ToSendMax] = 0xff;
+// 				ToSend[++ToSendMax] = 0x00;
+// 			}
+// 			b >>= 1;
+// 		}
+// 	}
 
-	// Send EOF
-	ToSend[++ToSendMax] = 0xff;
-	ToSend[++ToSendMax] = 0x00;
-	ToSend[++ToSendMax] = 0xff;
-	ToSend[++ToSendMax] = 0xff;
-	ToSend[++ToSendMax] = 0xff;
-	ToSend[++ToSendMax] = 0x00;
-	ToSend[++ToSendMax] = 0x00;
-	ToSend[++ToSendMax] = 0x00;
+// 	// Send EOF
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0xff;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0x00;
+// 	ToSend[++ToSendMax] = 0x00;
 
-	// Convert from last byte pos to length
-	ToSendMax++;
-}
+// 	// Convert from last byte pos to length
+// 	ToSendMax++;
+// }
 
 struct card_memory{
 	uint8_t	 uid[8];
@@ -1720,7 +1720,7 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 	map->uid[6], //use uid1 as IC reference
 	0x00, 0x00 /*CRC*/};
 	memcpy(&cmdRespGetSystemInfo[2], map->uid, 8);
-	AddCrc(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo) -2);
+	// AddCrc(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo) -2);
 	
 	uint8_t cmdRespReadSinglBlock[] = { /*Flags*/0x00,/*Data*/0xDE,0xAD,0xBE,0xEF, /*CRC*/ 0x00, 0x00  };
 	AddCrc(cmdRespReadSinglBlock, sizeof(cmdRespReadSinglBlock) -2);
@@ -1744,89 +1744,89 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 	for (int i = 0; i<28; ++i) {
 		memcpy(&cmdRespReadMulBlock[1+i*4], &map->block[i].data, 4);
 	}
-	AddCrc(cmdRespReadMulBlock, sizeof(cmdRespReadMulBlock) -2);
+	// AddCrc(cmdRespReadMulBlock, sizeof(cmdRespReadMulBlock) -2);
 
-	uint8_t *resp;
-	int respLen;
+	// uint8_t *resp;
+	// int respLen;
 	uint8_t *respdata = NULL;
 	int respsize = 0;
 
 	// Prepare card messages
-	ToSendMax = 0;
+	// ToSendMax = 0;
 
-	// Inventory
-	// ???: Takes 16 bytes for SOF/EOF and ? *16 = ??? bytes (2 bytes/bit)
-	uint8_t *respInventory = (((uint8_t *)BigBuf) + FREE_BUFFER_OFFSET);
-	int respInventoryLen;
-	// Build a suitable reponse to the reader INVENTORY cocmmand
-	CodeIso15693TagAnswer(cmdRespInventory, sizeof(cmdRespInventory));
-	memcpy(respInventory, ToSend, ToSendMax); respInventoryLen = ToSendMax;
-	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax);
+// 	// Inventory
+// 	// ???: Takes 16 bytes for SOF/EOF and ? *16 = ??? bytes (2 bytes/bit)
+// 	uint8_t *respInventory = (((uint8_t *)BigBuf) + FREE_BUFFER_OFFSET);
+// 	int respInventoryLen;
+// 	// Build a suitable reponse to the reader INVENTORY cocmmand
+// 	CodeIso15693TagAnswer(cmdRespInventory, sizeof(cmdRespInventory));
+// 	memcpy(respInventory, ToSend, ToSendMax); respInventoryLen = ToSendMax;
+// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax);
 
-	// Respond SOF -- takes 8 bytes
-	uint8_t *respGetSystemInfo = (respInventory + ToSendMax );
-	int respGetSystemInfoLen;
-	// Get System Info
-	CodeIso15693TagAnswer(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo));
-	memcpy(respGetSystemInfo, ToSend, ToSendMax); respGetSystemInfoLen = ToSendMax;
-	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
-// ReadSingleBlock
-	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
-	uint8_t *respReadSingleBlock = (respGetSystemInfo + ToSendMax );
-	int respReadSingleBlockLen;
-	CodeIso15693TagAnswer(cmdRespReadSinglBlock, sizeof(cmdRespReadSinglBlock));
-	memcpy(respReadSingleBlock, ToSend, ToSendMax); respReadSingleBlockLen = ToSendMax;
-	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	// Respond SOF -- takes 8 bytes
+// 	uint8_t *respGetSystemInfo = (respInventory + ToSendMax );
+// 	int respGetSystemInfoLen;
+// 	// Get System Info
+// 	CodeIso15693TagAnswer(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo));
+// 	memcpy(respGetSystemInfo, ToSend, ToSendMax); respGetSystemInfoLen = ToSendMax;
+// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// // ReadSingleBlock
+// 	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
+// 	uint8_t *respReadSingleBlock = (respGetSystemInfo + ToSendMax );
+// 	int respReadSingleBlockLen;
+// 	CodeIso15693TagAnswer(cmdRespReadSinglBlock, sizeof(cmdRespReadSinglBlock));
+// 	memcpy(respReadSingleBlock, ToSend, ToSendMax); respReadSingleBlockLen = ToSendMax;
+// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
 	
-	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
-	uint8_t *resp3 = (respReadSingleBlock + ToSendMax );
-	int resp3Len;
-	CodeIso15693TagAnswer(cmdRespReadSinglBlockWithSecStatus, sizeof(cmdRespReadSinglBlockWithSecStatus));
-	memcpy(resp3, ToSend, ToSendMax); resp3Len = ToSendMax;
-	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
+// 	uint8_t *resp3 = (respReadSingleBlock + ToSendMax );
+// 	int resp3Len;
+// 	CodeIso15693TagAnswer(cmdRespReadSinglBlockWithSecStatus, sizeof(cmdRespReadSinglBlockWithSecStatus));
+// 	memcpy(resp3, ToSend, ToSendMax); resp3Len = ToSendMax;
+// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 	
-	//
-	uint8_t *respOK = (resp3 + ToSendMax );
-	int respOKLen;
-	CodeIso15693TagAnswer(cmdRespOK, sizeof(cmdRespOK));
-	memcpy(respOK, ToSend, ToSendMax); respOKLen = ToSendMax;
-	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	//
+// 	uint8_t *respOK = (resp3 + ToSendMax );
+// 	int respOKLen;
+// 	CodeIso15693TagAnswer(cmdRespOK, sizeof(cmdRespOK));
+// 	memcpy(respOK, ToSend, ToSendMax); respOKLen = ToSendMax;
+// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
-	//
-	uint8_t *respError = (respOK + ToSendMax );
-	int respErrorLen;
-	CodeIso15693TagAnswer(cmdRespError, sizeof(cmdRespError));
-	memcpy(respError, ToSend, ToSendMax); respErrorLen = ToSendMax;
-	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	//
+// 	uint8_t *respError = (respOK + ToSendMax );
+// 	int respErrorLen;
+// 	CodeIso15693TagAnswer(cmdRespError, sizeof(cmdRespError));
+// 	memcpy(respError, ToSend, ToSendMax); respErrorLen = ToSendMax;
+// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
-	//
-	uint8_t *respMulBlockSecStatus = (respError + ToSendMax );
-	int respMulBlockSecStatusLen;
-	CodeIso15693TagAnswer(cmdRespMulBlockSecStatus, sizeof(cmdRespMulBlockSecStatus));
-	memcpy(respMulBlockSecStatus, ToSend, ToSendMax); respMulBlockSecStatusLen = ToSendMax;
-	if (DEBUG) Dbprintf("cmdRespMulBlockSecStatus Bigbuf Used : %d",ToSendMax );
+// 	//
+// 	uint8_t *respMulBlockSecStatus = (respError + ToSendMax );
+// 	int respMulBlockSecStatusLen;
+// 	CodeIso15693TagAnswer(cmdRespMulBlockSecStatus, sizeof(cmdRespMulBlockSecStatus));
+// 	memcpy(respMulBlockSecStatus, ToSend, ToSendMax); respMulBlockSecStatusLen = ToSendMax;
+// 	if (DEBUG) Dbprintf("cmdRespMulBlockSecStatus Bigbuf Used : %d",ToSendMax );
 
-	//
-	// uint8_t *respReadMulBlock = (respMulBlockSecStatus + ToSendMax );
-	uint8_t *respReadMulBlock = (respGetSystemInfo);
-	int respReadMulBlockLen;
-	CodeIso15693TagAnswer(cmdRespReadMulBlock, sizeof(cmdRespReadMulBlock));
-	memcpy(respReadMulBlock, ToSend, ToSendMax); respReadMulBlockLen = ToSendMax;
-	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	//
+// 	// uint8_t *respReadMulBlock = (respMulBlockSecStatus + ToSendMax );
+// 	uint8_t *respReadMulBlock = (respGetSystemInfo);
+// 	int respReadMulBlockLen;
+// 	CodeIso15693TagAnswer(cmdRespReadMulBlock, sizeof(cmdRespReadMulBlock));
+// 	memcpy(respReadMulBlock, ToSend, ToSendMax); respReadMulBlockLen = ToSendMax;
+// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
 
-	uint8_t cmdRespReadBlockFromMap[] = { /*Flags*/0x00,/*data*/ 0x00, 0x00, 0x00, 0x00, /*CRC*/ 0x00, 0x00  };
-	uint8_t *respReadBlockFromMap = (respReadMulBlock + ToSendMax );
+	uint8_t cmdRespReadBlockFromMap[28][8] = { {/*Flags*/0x00,/*data*/ 0x00, 0x00, 0x00, 0x00, /*CRC*/ 0x00, 0x00}  };
+	// uint8_t *respReadBlockFromMap = (respReadMulBlock + ToSendMax );
 	
 	for (int i = 0; i<28; ++i) {
-		memcpy(&cmdRespReadBlockFromMap[1], map->block[i].data, 4);
-		AddCrc(cmdRespReadBlockFromMap, sizeof(cmdRespReadBlockFromMap) -2);
-		CodeIso15693TagAnswer(cmdRespReadBlockFromMap, sizeof(cmdRespReadBlockFromMap));
-		memcpy(&respReadBlockFromMap[i*ToSendMax], ToSend, ToSendMax);
+		memcpy(&cmdRespReadBlockFromMap[i][1], map->block[i].data, 4);
+		// AddCrc(cmdRespReadBlockFromMap[i], sizeof(cmdRespReadBlockFromMap[i]) -2);
+// 		CodeIso15693TagAnswer(cmdRespReadBlockFromMap, sizeof(cmdRespReadBlockFromMap));
+// 		memcpy(&respReadBlockFromMap[i*ToSendMax], ToSend, ToSendMax);
 	}
-	int respReadBlockFromMapLen = ToSendMax;
-	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	int respReadBlockFromMapLen = ToSendMax;
+// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
 
 	// + 1720..
   uint8_t *receivedCmd = (((uint8_t *)BigBuf) + RECV_CMD_OFFSET);
@@ -1839,7 +1839,10 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 
 	// To control where we are in the protocol
 	int cmdsRecvd = 0;
-	int uidLen = 0;
+
+	//cmd args
+	int uidLen = 0, flag_option = 0;
+	uint8_t startBlock = 0, blockCount = 0;
 
 	LED_A_ON();
 	for(;;) {
@@ -1850,36 +1853,40 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 		}
 
 		uidLen = 8 * !!(receivedCmd[0] & ISO15_REQ_ADDRESS);
+		flag_option = !!(receivedCmd[0] & ISO15_REQ_OPTION);
 		// Okay, look at the command now.
 		if(len > 2 && receivedCmd[1] == 0x01) {
 		// Inventory Request
-	        resp = respInventory; respLen = respInventoryLen;
+	        // resp = respInventory; respLen = respInventoryLen;
 	        respdata = cmdRespInventory;
 	        respsize = sizeof(cmdRespInventory);
 	        // Dbhexdump(respsize,respdata,false);			//never use Dbhexdump in here,will case timeout!!
 	        // Dbhexdump(respLen,resp,false);
 		} else if(len > 2 && receivedCmd[1] == 0x2B) {
 			// Get System Information Request
-			resp = respGetSystemInfo; respLen = respGetSystemInfoLen;
+			// resp = respGetSystemInfo; respLen = respGetSystemInfoLen;
+			AddCrc(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo) -2);
 	        respdata = cmdRespGetSystemInfo;
 	        respsize = sizeof(cmdRespGetSystemInfo);
         } else if(len > 2 && receivedCmd[1] == 0x20) {
 			// Read Single Block Request
 			if(receivedCmd[0] & ISO15_REQ_OPTION) {
 				// request block security status
-				resp = resp3; respLen = resp3Len;
+				// resp = resp3; respLen = resp3Len;
 		        respdata = cmdRespReadSinglBlockWithSecStatus;
 		        respsize = sizeof(cmdRespReadSinglBlockWithSecStatus);
 			} else {
-				if (receivedCmd[1 + uidLen +1] < 28 ){
+				uint8_t blockNumber = receivedCmd[1 + uidLen +1];
+				if (blockNumber < 28 ){
 					// return block in map;
-					resp = &respReadBlockFromMap[respReadBlockFromMapLen * receivedCmd[1 + uidLen +1]];
-					respLen = respReadBlockFromMapLen;
-			        respdata = (uint8_t*)&map->block[receivedCmd[1 + uidLen +1]];
-			        respsize = 5;
+					// resp = &respReadBlockFromMap[respReadBlockFromMapLen * receivedCmd[1 + uidLen +1]];
+					// respLen = respReadBlockFromMapLen;
+					AddCrc(cmdRespReadBlockFromMap[blockNumber], sizeof(cmdRespReadBlockFromMap[blockNumber]) -2);
+			        respdata = cmdRespReadBlockFromMap[blockNumber];
+			        respsize = sizeof(cmdRespReadBlockFromMap[blockNumber]);
 		        } else {
 		        	// return default 'blank' block;
-		        	resp = respReadSingleBlock; respLen = respReadSingleBlockLen;
+		        	// resp = respReadSingleBlock; respLen = respReadSingleBlockLen;
 			        respdata = cmdRespReadSinglBlock;
 			        respsize = sizeof(cmdRespReadSinglBlock);
 		        }
@@ -1887,34 +1894,36 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 	    } else if(len > 2 && receivedCmd[1] == 0x22) {	
 			// Lock Block
 			/*Now just return ok,maybe we should change the security block in map too*/
-			resp = respOK; respLen = respOKLen;
+			// resp = respOK; respLen = respOKLen;
 	        respdata = cmdRespOK;
 	        respsize = sizeof(cmdRespOK);
 	    } else if(len > 2 && receivedCmd[1] == 0x00) {	
-			resp = respError; respLen = respErrorLen;
+			// resp = respError; respLen = respErrorLen;
 	        respdata = cmdRespError;
 	        respsize = sizeof(cmdRespError);
 	    } else if(len > 2 && receivedCmd[1] == 0x2c && receivedCmd[1 +uidLen + 1] == 0x00 && receivedCmd[1 +uidLen + 2] >= 0x1b) {	
 	    	//  Get multiple block security status 
-			resp = respMulBlockSecStatus; respLen = respMulBlockSecStatusLen;
+			// resp = respMulBlockSecStatus; respLen = respMulBlockSecStatusLen;
 	        respdata = cmdRespMulBlockSecStatus;
 	        respsize = sizeof(cmdRespMulBlockSecStatus);
-	    } else if(len > 2 && receivedCmd[1] == 0x23 && !(receivedCmd[0] & ISO15_REQ_OPTION)
-	    	&& receivedCmd[1 +uidLen + 1] == 0x00 && receivedCmd[1 +uidLen + 2] >= 0x1b) {	
-			resp = respReadMulBlock; respLen = respReadMulBlockLen;
-	        respdata = cmdRespReadMulBlock;
-	        respsize = sizeof(cmdRespReadMulBlock);
+	    } else if(len > 2 && receivedCmd[1] == 0x23 && (startBlock=receivedCmd[1 +uidLen + 1]) <= 0x1b) {
+			blockCount = receivedCmd[1 +uidLen + 2];
+	    	blockCount = ( blockCount+startBlock > 0x1b )? 0x1b - startBlock:blockCount;
+	    	for (int i = startBlock; i <= blockCount; ++i) {
+				memcpy(&cmdRespReadMulBlock[1+i*(4+flag_option)], (uint8_t*)(&map->block[i])+!flag_option, 4+flag_option);
+			}
+			respdata = cmdRespReadMulBlock;
+	        respsize = 1 + (blockCount+1) * (4+flag_option) + 2;
+			AddCrc(cmdRespReadMulBlock, respsize -2);
 		} else {
 			// Never seen this command before
-			Dbprintf("Unknown command received from reader (len=%d): %x %x %x %x %x %x %x %x %x",
-			len,
-			receivedCmd[0], receivedCmd[1], receivedCmd[2],
-			receivedCmd[3], receivedCmd[4], receivedCmd[5],
-			receivedCmd[6], receivedCmd[7], receivedCmd[8]);
+			Dbprintf("Unknown command received from reader (len=%d): ",	len);
+			Dbhexdump(len,receivedCmd,false);
 			// Do not respond
-			resp = respError; respLen = respErrorLen; //order = 0;
-			respdata = cmdRespError;
-			respsize = sizeof(cmdRespError);
+			respdata = NULL;
+			respsize = 0;
+			// respdata = cmdRespError;
+			// respsize = sizeof(cmdRespError);
 		}
 
 		if(cmdsRecvd > 999) {
@@ -1925,11 +1934,8 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 			cmdsRecvd++;
 		}
 
-		//DEBUG/////////
-		resp = respdata; respLen= respsize;
-		//DEBUG/////////
-		if(respLen > 0) {
-			SendIso15693Answer(resp, respLen, 0);
+		if(respsize > 0) {
+			SendIso15693Answer(respdata, respsize, 0);
 		}
 
 		// Dbprintf("received from reader (len=%d): %x %x %x %x %x %x %x %x %x",
