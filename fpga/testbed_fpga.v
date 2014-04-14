@@ -9,13 +9,17 @@ module testbed_fpga;
     wire adc_clk, adc_noe;
     reg ssp_dout;
     wire ssp_frame, ssp_din, ssp_clk;
+    reg cross_hi, cross_lo;
+    wire dbg;
 
     fpga dut(
         spck, miso, mosi, ncs,
         pck0i, ck_1356meg, ck_1356megb,
         pwr_lo, pwr_hi, pwr_oe1, pwr_oe2, pwr_oe3, pwr_oe4,
         adc_d, adc_clk, adc_noe,
-        ssp_frame, ssp_din, ssp_dout, ssp_clk
+        ssp_frame, ssp_din, ssp_dout, ssp_clk,
+        cross_hi, cross_lo,
+        dbg
     );
 
 	integer i;
@@ -46,5 +50,5 @@ module testbed_fpga;
 		#50 mosi=1;
 		$finish;
 	end
-	
+
 endmodule // main

@@ -327,7 +327,7 @@ int CmdHF15Sim(const char *Cmd)
 		return 0;
 	}
 
-	if( 0x1c != fread(c.d.asBytes + sizeof(UID), 1 + 4, 28, f)) {
+	if( 0x1c != fread(c.d.asBytes + sizeof(UID), 1 + 4, 0x1c, f)) {
 		PrintAndLog("'%s' is malformed, should be 5 bytes(1 security byte + 4 data byte) * 28 blocks", filename);
 		return 2;
 	}

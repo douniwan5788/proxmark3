@@ -10,6 +10,8 @@
 `define READER_LISTEN	3'b011
 `define READER_MOD		3'b100
 
+`define TAGSIM_MOD2		3'b101
+
 module hi_iso14443a(
     pck0, ck_1356meg, ck_1356megb,
     pwr_lo, pwr_hi, pwr_oe1, pwr_oe2, pwr_oe3, pwr_oe4,
@@ -32,8 +34,6 @@ module hi_iso14443a(
 
 wire adc_clk = ck_1356meg;
 
-
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reader -> PM3:
 // detecting and shaping the reader's signal. Reader will modulate the carrier by 100% (signal is either on or off). Use a
@@ -47,7 +47,7 @@ begin
     else if(adc_d < 8) after_hysteresis <= 1'b0;  		// U < 	1,04V 	-> after_hysteresis = 0
 	// Note: was >= 3,53V and <= 1,19V. The new trigger values allow more reliable detection of the first bit
 	// (it might not reach 3,53V due to the high time constant of the high pass filter in the analogue RF part).
-	// In addition, the new values are more in line with ISO14443-2: "The PICC shall detect the ”End of Pause” after the field exceeds
+	// In addition, the new values are more in line with ISO14443-2: "The PICC shall detect the ”End of Pause?after the field exceeds
 	// 5% of H_INITIAL and before it exceeds 60% of H_INITIAL." Depending on the signal strength, 60% might well be less than 3,53V.
 
 
@@ -113,10 +113,10 @@ end
 // store 4 previous samples:
 reg [7:0] input_prev_4, input_prev_3, input_prev_2, input_prev_1;
 // convert to signed signals (and multiply by two for samples at t-4 and t)
-wire signed [10:0] input_prev_4_times_2 = {0, 0, input_prev_4, 0};
-wire signed [10:0] input_prev_3_times_1 = {0, 0, 0, input_prev_3};
-wire signed [10:0] input_prev_1_times_1 = {0, 0, 0, input_prev_1};
-wire signed [10:0] adc_d_times_2 = {0, 0, adc_d, 0};
+wire signed [10:0] input_prev_4_times_2 = {1'd0, 1'd0, input_prev_4, 1'd0};
+wire signed [10:0] input_prev_3_times_1 = {1'd0, 1'd0, 1'd0, input_prev_3};
+wire signed [10:0] input_prev_1_times_1 = {1'd0, 1'd0, 1'd0, input_prev_1};
+wire signed [10:0] adc_d_times_2 = {1'd0, 1'd0, adc_d, 1'd0};
 
 wire signed [10:0] tmp_1, tmp_2;
 wire signed [10:0] adc_d_filtered;
@@ -175,7 +175,7 @@ begin
 		end
 		reader_falling_edge_time[3:0] <= 4'd8;			// adjust only once per detected edge
 	end
-	else if (negedge_cnt == 7'd127)						// normal operation: count from 0 to 127
+	else if (negedge_cnt == 7'd127 || negedge_cnt ===7'dx )						// normal operation: count from 0 to 127
 	begin
 		negedge_cnt <= 0;
 	end
@@ -363,7 +363,7 @@ reg mod_sig_coil;
 
 always @(negedge adc_clk)
 begin
-	if (mod_type == `TAGSIM_MOD)			 // need to take care of proper fdt timing
+	if ( (mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2) )			 // need to take care of proper fdt timing
 	begin
 		if(fdt_counter == `FDT_COUNT)
 		begin
@@ -540,7 +540,7 @@ begin
 		// What do we communicate to the ARM
 		if(mod_type == `TAGSIM_LISTEN)
 			sendbit = after_hysteresis;
-		else if(mod_type == `TAGSIM_MOD)
+		else if((mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2))
 			/* if(fdt_counter > 11'd772) sendbit = mod_sig_coil; // huh?
 			else */
 			sendbit = fdt_indicator;
@@ -554,7 +554,7 @@ begin
 	if(mod_type == `SNIFFER)
 		// send sampled reader and tag data:
 		bit_to_arm = to_arm[7];
-	else if (mod_type == `TAGSIM_MOD && fdt_elapsed && temp_buffer_reset)
+	else if ((mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2) && fdt_elapsed && temp_buffer_reset)
 		// send timing information:
 		bit_to_arm = to_arm[7];
 	else
@@ -567,32 +567,73 @@ end
 
 assign ssp_din = bit_to_arm;
 
-// Subcarrier (adc_clk/16, for TAGSIM_MOD only).
-wire sub_carrier;
-assign sub_carrier = ~sub_carrier_cnt[4];
 
-
-wire sub_carrier2;
-reg [4:0] sub_carrier_cnt2
+reg [4:0] sub_carrier_cnt1;
+reg sub_carrier1;
+reg [3:0] sub_carrier_pulse_counter1;
 always @(negedge adc_clk)
 begin
-    if(mod_type == `TAGSIM_MODFSK && mod_sig_coil == 1'b0 )
-        if(sub_carrier_cnt2 = 4'd???)
+    if(mod_type == `TAGSIM_MOD2 && mod_sig_coil == 1'd1 )
+        if(sub_carrier_cnt1 == 5'd16)        // fc/32
         begin
-            sub_carrier_cnt2 <= 0;
-            sub_carrier2 <= ~sub_carrier2;
+            sub_carrier_cnt1 <= 5'd0;
+            sub_carrier1 <= ~sub_carrier1;
+            sub_carrier_pulse_counter1 <= sub_carrier_pulse_counter1 + 1;
         end
         else
-            sub_carrier_cnt2 <= sub_carrier_cnt2 +1;
+            sub_carrier_cnt1 <= sub_carrier_cnt1 + 1;
     else
     begin
-        sub_carrier_cnt2 <= 0;
-        sub_carrier2 <= 0;
+        sub_carrier_cnt1 <= 5'd0;
+        sub_carrier1 <= 1'd0;
+        sub_carrier_pulse_counter1 <= 4'd0;
+    end
+end
+
+reg [4:0] sub_carrier_cnt2;
+reg sub_carrier2;
+reg [3:0] sub_carrier_pulse_counter2;
+always @(negedge adc_clk)
+begin
+    if(mod_type == `TAGSIM_MOD2 && mod_sig_coil == 1'd0 )
+        if(sub_carrier_cnt2 == 5'd14)        // fc/28
+        begin
+            sub_carrier_cnt2 <= 1'd0;
+            sub_carrier2 <= ~sub_carrier2;
+            sub_carrier_pulse_counter2 <= sub_carrier_pulse_counter2 + 1;
+        end
+        else
+            sub_carrier_cnt2 <= sub_carrier_cnt2 + 1;
+    else
+    begin
+        sub_carrier_cnt2 <= 5'd0;
+        sub_carrier2 <= 1'd0;
+        sub_carrier_pulse_counter2 <= 4'd0;
     end
 end
 
 
-assign sub_carrier2 = (mod_type == `TAGSIM_MODFSK) & ~sub_carrier_cnt[4];
+wire half_bit_send_over;
+assign half_bit_send_over = sub_carrier_pulse_counter2 == 4'd8 || sub_carrier_pulse_counter2 == 4'd9;
+
+
+//	fifo_8in_1out fifo(.din(),
+//		.rd_clk(),
+//		.rd_en(),
+//		.rst(),
+//		.wr_clk(),
+//		.wr_en(),
+//		.almost_empty(),
+//		.almost_full(),
+//		.dout(),
+//		.empty(),
+//		.full());
+
+//always @(posedge half_bit_send_over) begin
+//	// if(sending_en) begin
+//        mod_sig = mod_sig_buf[mod_sig_ptr];                 // the delayed signal.
+//	// end
+//end
 
 
 // in READER_MOD: drop carrier for mod_sig_coil==1 (pause); in READER_LISTEN: carrier always on; in other modes: carrier always off
@@ -603,10 +644,15 @@ assign pwr_hi = (ck_1356megb & (((mod_type == `READER_MOD) & ~mod_sig_coil) || (
 assign pwr_oe1 = 1'b0;
 assign pwr_oe3 = 1'b0;
 
+// Subcarrier (adc_clk/32, for TAGSIM_MOD only).
+wire sub_carrier;
+assign sub_carrier = ~sub_carrier_cnt[4];
+
 // TAGSIM_MOD: short circuit antenna with different resistances (modulated by sub_carrier modulated by mod_sig_coil)
 // for pwr_oe4 = 1 (tristate): antenna load = 10k || 33			= 32,9 Ohms
 // for pwr_oe4 = 0 (active):   antenna load = 10k || 33 || 33  	= 16,5 Ohms
-assign pwr_oe4 = ~( (mod_sig_coil & sub_carrier | ~mod_sig_coil & sub_carrier2) & (mod_type == `TAGSIM_MOD));
+assign pwr_oe4 = ~( (mod_sig_coil & sub_carrier) & (mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2) );
+// assign pwr_oe4 = ~( ((mod_sig_coil & sub_carrier) | (~mod_sig_coil & sub_carrier2)) & (mod_type == `TAGSIM_MOD) );
 
 // This is all LF, so doesn't matter.
 assign pwr_oe2 = 1'b0;
