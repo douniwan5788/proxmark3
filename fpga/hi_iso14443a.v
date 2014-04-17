@@ -3,6 +3,7 @@
 // Gerhard de Koning Gans, April 2008
 //-----------------------------------------------------------------------------
 
+`include "fifo_8in_1out.v"
 // constants for the different modes:
 `define SNIFFER			3'b000
 `define TAGSIM_LISTEN	3'b001
@@ -33,6 +34,25 @@ module hi_iso14443a(
 
 
 wire adc_clk = ck_1356meg;
+
+reg [7:0] recv_buf;
+reg fifo_rst;
+
+fifo_8in_1out fifo(
+	.din(recv_buf),
+	.rd_clk(fifo_rd_clk),
+	.rd_en(fifo_rd_en),
+	.rst(fifo_rst),
+	.wr_clk(fifo_wr_clk),
+	.wr_en(fifo_wr_en),
+	.prog_empty(fifo_prog_empty),
+	.dout(fifo_dout),
+	.empty(fifo_empty),
+	.full(fifo_full),
+      .rd_data_count(fifo_rd_data_count),
+      .wr_data_count(fifo_wr_data_count)
+	);
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reader -> PM3:
@@ -284,17 +304,22 @@ begin
 	if(negedge_cnt[4:0] == 5'd0) 	// sample data at rising edge of ssp_clk - ssp_dout changes at the falling edge.
 	begin
 		mod_sig_buf[31:2] <= mod_sig_buf[30:1];  			// shift
+
 		if (~ssp_dout && ~mod_sig_buf[1])
 			mod_sig_buf[1] <= 1'b0;							// delete the correction bit (a single 1 preceded and succeeded by 0)
 		else
 			mod_sig_buf[1] <= mod_sig_buf[0];
-		mod_sig_buf[0] <= ssp_dout;							// add new data to the delay line
 
+		mod_sig_buf[0] <= ssp_dout;							// add new data to the delay line
 		mod_sig = mod_sig_buf[mod_sig_ptr];					// the delayed signal.
 	end
+
+	if(negedge_cnt[3:0] == 4'd0)
+	begin
+		recv_buf[7:1] <= recv_buf[6:0];		//recv_buf <<= 1
+		recv_buf[0] <= ssp_dout;
+	end
 end
-
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // PM3 -> Tag, internal timing:
@@ -306,7 +331,7 @@ end
 reg [10:0] fdt_counter;
 reg fdt_indicator, fdt_elapsed;
 reg [4:0] mod_sig_flip;
-reg [4:0] sub_carrier_cnt;
+reg [7:0] sub_carrier_cnt;
 
 // we want to achieve a delay of 1172. The RF part already has delayed the reader signals's rising edge
 // by 9 ticks, the ADC took 3 ticks and there is always a delay of 32 ticks by the mod_sig_buf. Therefore need to
@@ -318,6 +343,13 @@ reg [4:0] sub_carrier_cnt;
 // fdt_indicator could appear at ssp_din after 1 tick, the transfer needs 16 ticks, the ARM can send 128 ticks later.
 // 1128 - 464 - 1 - 128 - 8 = 535
 `define FDT_INDICATOR_COUNT 11'd535
+
+// reset fifo befor FDT_INDICATOR
+`define INIT_DURING_FDT_COUNT 11'd500
+
+// reset fifo befor FDT_INDICATOR
+`define FIRST_RD_CLK_FDT_COUNT 11'd1000
+
 
 // reset on a pause in listen mode. I.e. the counter starts when the pause is over:
 assign fdt_reset = ~after_hysteresis && mod_type == `TAGSIM_LISTEN;
@@ -333,26 +365,49 @@ begin
 	else
 	begin
 		if(fdt_counter == `FDT_COUNT)
-		begin
 			if(~fdt_elapsed)							// just reached fdt.
 			begin
 				mod_sig_flip <= negedge_cnt[4:0];		// start modulation at this time
-				sub_carrier_cnt <= 5'd0;				// subcarrier phase in sync with start of modulation
+				sub_carrier_cnt <= 8'd0;				// subcarrier phase in sync with start of modulation
 				fdt_elapsed <= 1'b1;
+
 			end
 			else
-			begin
-				sub_carrier_cnt <= sub_carrier_cnt + 1;
-			end
-		end
+				if(sub_carrier_cnt == 8'd223)
+				    sub_carrier_cnt <= 0;
+				else
+					sub_carrier_cnt <= sub_carrier_cnt + 1;
 		else
-		begin
 			fdt_counter <= fdt_counter + 1;
-		end
 	end
 
 	if(fdt_counter == `FDT_INDICATOR_COUNT) fdt_indicator <= 1'b1;
 end
+
+// reg [3:0]rst_count;
+
+// wire rst_clk;
+// assign rst_clk = ssp_clk;
+
+// always @(negedge rst_clk)
+// begin
+// 	if(fdt_counter >= `INIT_DURING_FDT_COUNT)
+// 	begin
+// 		if(rst_count < 15) begin
+// 			rst_count <= rst_count + 1;
+
+// 			if(rst_count == 0) begin
+// 				fifo_rst = 1;
+// 			end
+// 			if(rst_count == 1) begin
+// 				fifo_rst = 0;
+// 			end
+// 		end
+// 	end
+// 	else
+// 		rst_count <= 0;
+// end
+
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -363,7 +418,7 @@ reg mod_sig_coil;
 
 always @(negedge adc_clk)
 begin
-	if ( (mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2) )			 // need to take care of proper fdt timing
+	if ( (mod_type == `TAGSIM_MOD) )			 // need to take care of proper fdt timing
 	begin
 		if(fdt_counter == `FDT_COUNT)
 		begin
@@ -385,7 +440,7 @@ end
 
 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // PM3 -> Reader
 // determine the required delay in the mod_sig_buf (set mod_sig_ptr).
 reg temp_buffer_reset;
@@ -434,9 +489,10 @@ end
 // buffer 8 bits data to be sent to ARM. Shift them out bit by bit.
 reg [7:0] to_arm;
 
+reg [2:0] data_coming;
 always @(negedge adc_clk)
 begin
-	if (negedge_cnt[5:0] == 6'd63)							// fill the buffer
+	if (negedge_cnt[6:0] == 7'h7f)							// fill the buffer
 	begin
 		if (mod_type == `SNIFFER)
 		begin
@@ -449,9 +505,16 @@ begin
 				to_arm <= {reader_data[3:0], tag_data[3:0]};
 			end
 		end
+		else if(mod_type == `TAGSIM_MOD2)
+		begin
+			to_arm[7:0] <= fifo_prog_empty & fdt_indicator;
+			data_coming[2:1] <= data_coming[1:0];
+			data_coming[0] <= fifo_prog_empty & fdt_indicator;
+		end
 		else
 		begin
-			to_arm[7:0] <= {mod_sig_ptr[4:0], mod_sig_flip[3:1]}; // feedback timing information
+			// to_arm[7:0] <= {mod_sig_ptr[4:0], mod_sig_flip[3:1]}; // feedback timing information
+			to_arm[7:0] <= 8'd0;
 		end
 	end
 
@@ -481,7 +544,7 @@ end
 // generate a ssp clock and ssp frame signal for the synchronous transfer from/to the ARM
 reg ssp_clk;
 reg ssp_frame;
-reg [2:0] ssp_frame_counter;
+// reg [2:0] ssp_frame_counter;
 
 always @(negedge adc_clk)
 begin
@@ -526,7 +589,6 @@ begin
 end
 
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FPGA -> ARM communication:
 // select the data to be sent to ARM
@@ -554,8 +616,11 @@ begin
 	if(mod_type == `SNIFFER)
 		// send sampled reader and tag data:
 		bit_to_arm = to_arm[7];
-	else if ((mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2) && fdt_elapsed && temp_buffer_reset)
+	else if ((mod_type == `TAGSIM_MOD ) && fdt_elapsed && temp_buffer_reset)
 		// send timing information:
+		bit_to_arm = to_arm[7];
+	else if (mod_type == `TAGSIM_MOD2)
+		// send recv_ready sig
 		bit_to_arm = to_arm[7];
 	else
 		// send data or fdt_indicator
@@ -567,73 +632,101 @@ end
 
 assign ssp_din = bit_to_arm;
 
+reg new_mod_sig_coil;
+reg [7:0] pre_sub_carrier_cnt1;
+reg [7:0] pre_sub_carrier_cnt2;
 
-reg [4:0] sub_carrier_cnt1;
 reg sub_carrier1;
-reg [3:0] sub_carrier_pulse_counter1;
-always @(negedge adc_clk)
+reg [4:0] sub_carrier_halfpulse_counter1;
+always @(negedge adc_clk )
 begin
-    if(mod_type == `TAGSIM_MOD2 && mod_sig_coil == 1'd1 )
-        if(sub_carrier_cnt1 == 5'd16)        // fc/32
+    if(mod_type == `TAGSIM_MOD2 && new_mod_sig_coil == 1'd1)
+    begin
+        if(sub_carrier_cnt - pre_sub_carrier_cnt1 == 8'd16 || 'd223 + sub_carrier_cnt - pre_sub_carrier_cnt1 == 8'd16)
         begin
-            sub_carrier_cnt1 <= 5'd0;
+          	pre_sub_carrier_cnt1 <= sub_carrier_cnt;
             sub_carrier1 <= ~sub_carrier1;
-            sub_carrier_pulse_counter1 <= sub_carrier_pulse_counter1 + 1;
+            if(sub_carrier_halfpulse_counter1 == 5'd15)
+            	sub_carrier_halfpulse_counter1 <= 0;
+        	else
+            sub_carrier_halfpulse_counter1 <= sub_carrier_halfpulse_counter1 + 1;
         end
-        else
-            sub_carrier_cnt1 <= sub_carrier_cnt1 + 1;
+    end
     else
     begin
-        sub_carrier_cnt1 <= 5'd0;
+		pre_sub_carrier_cnt1 <= sub_carrier_cnt ;
         sub_carrier1 <= 1'd0;
-        sub_carrier_pulse_counter1 <= 4'd0;
+        sub_carrier_halfpulse_counter1 <= 4'd0;
     end
+
+	if(fdt_counter == `FDT_COUNT && ~fdt_elapsed) begin
+		pre_sub_carrier_cnt1 <= 0;
+		sub_carrier_halfpulse_counter1 <= 0;
+	end
 end
 
-reg [4:0] sub_carrier_cnt2;
 reg sub_carrier2;
-reg [3:0] sub_carrier_pulse_counter2;
+reg [4:0] sub_carrier_halfpulse_counter2;
 always @(negedge adc_clk)
 begin
-    if(mod_type == `TAGSIM_MOD2 && mod_sig_coil == 1'd0 )
-        if(sub_carrier_cnt2 == 5'd14)        // fc/28
-        begin
-            sub_carrier_cnt2 <= 1'd0;
+    if(mod_type == `TAGSIM_MOD2 && new_mod_sig_coil == 1'd0)
+    begin
+    	if( sub_carrier_cnt - pre_sub_carrier_cnt2 == 8'd14 || 'd223 + sub_carrier_cnt - pre_sub_carrier_cnt2 == 8'd14)
+    	begin
+   		    pre_sub_carrier_cnt2 <= sub_carrier_cnt;
             sub_carrier2 <= ~sub_carrier2;
-            sub_carrier_pulse_counter2 <= sub_carrier_pulse_counter2 + 1;
-        end
-        else
-            sub_carrier_cnt2 <= sub_carrier_cnt2 + 1;
+            if(sub_carrier_halfpulse_counter2 == 5'd17)
+            	sub_carrier_halfpulse_counter2 <= 0;
+        	else
+            	sub_carrier_halfpulse_counter2 <= sub_carrier_halfpulse_counter2 + 1;
+    	end
+    end
     else
     begin
-        sub_carrier_cnt2 <= 5'd0;
+    	pre_sub_carrier_cnt2 <= sub_carrier_cnt;
         sub_carrier2 <= 1'd0;
-        sub_carrier_pulse_counter2 <= 4'd0;
     end
+
+    if(fdt_counter == `FDT_COUNT && ~fdt_elapsed) begin
+		pre_sub_carrier_cnt2 <= 0;
+		sub_carrier_halfpulse_counter2 <= 0;
+	end
 end
 
 
 wire half_bit_send_over;
-assign half_bit_send_over = sub_carrier_pulse_counter2 == 4'd8 || sub_carrier_pulse_counter2 == 4'd9;
+assign half_bit_send_over = ((sub_carrier_halfpulse_counter1 >= 5'd15 || sub_carrier_halfpulse_counter2 >= 5'd17) & fdt_elapsed)
+							| ( (fdt_counter > `FIRST_RD_CLK_FDT_COUNT) & ~fdt_elapsed );
+// assign half_bit_send_over = (sub_carrier_halfpulse_counter1 >= 5'd16 || sub_carrier_halfpulse_counter2 <= 5'd9) ||
+// 							(sub_carrier_halfpulse_counter2 >= 5'd18 || sub_carrier_halfpulse_counter1 <= 5'd8 );
 
+reg [3:0] init_rd_clk_count;
+always @(negedge ssp_clk)
+begin
+	if(data_coming[2] & ~fdt_elapsed) begin
+		if(init_rd_clk_count < 7) begin
+			init_rd_clk_count <= init_rd_clk_count +1;
+		end
+	end
+	else
+		init_rd_clk_count <= 0;
+end
 
-//	fifo_8in_1out fifo(.din(),
-//		.rd_clk(),
-//		.rd_en(),
-//		.rst(),
-//		.wr_clk(),
-//		.wr_en(),
-//		.almost_empty(),
-//		.almost_full(),
-//		.dout(),
-//		.empty(),
-//		.full());
+assign fifo_rd_en = 1;
+assign fifo_rd_clk = ( (init_rd_clk_count > 0 && init_rd_clk_count < 3 ) ? ssp_clk :half_bit_send_over ) & (mod_type == `TAGSIM_MOD2);
+// assign fifo_rd_clk = half_bit_send_over & (mod_type == `TAGSIM_MOD2);
 
-//always @(posedge half_bit_send_over) begin
-//	// if(sending_en) begin
-//        mod_sig = mod_sig_buf[mod_sig_ptr];                 // the delayed signal.
-//	// end
-//end
+assign fifo_wr_en = 1;
+// assign fifo_wr_clk = ( (rst_count > 0 && rst_count < 5 )? rst_clk : (ssp_frame & data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
+assign fifo_wr_clk = ( (ssp_frame & data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
+
+always @(negedge half_bit_send_over)
+begin
+	if(mod_type == `TAGSIM_MOD2)
+	begin
+		new_mod_sig_coil <= fifo_dout;
+	end
+end
 
 
 // in READER_MOD: drop carrier for mod_sig_coil==1 (pause); in READER_LISTEN: carrier always on; in other modes: carrier always off
@@ -651,8 +744,10 @@ assign sub_carrier = ~sub_carrier_cnt[4];
 // TAGSIM_MOD: short circuit antenna with different resistances (modulated by sub_carrier modulated by mod_sig_coil)
 // for pwr_oe4 = 1 (tristate): antenna load = 10k || 33			= 32,9 Ohms
 // for pwr_oe4 = 0 (active):   antenna load = 10k || 33 || 33  	= 16,5 Ohms
-assign pwr_oe4 = ~( (mod_sig_coil & sub_carrier) & (mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2) );
-// assign pwr_oe4 = ~( ((mod_sig_coil & sub_carrier) | (~mod_sig_coil & sub_carrier2)) & (mod_type == `TAGSIM_MOD) );
+// wire old_pwr_oe4;
+// assign old_pwr_oe4 = ~( (mod_sig_coil & sub_carrier) & (mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2) );
+assign pwr_oe4 = ~( ((new_mod_sig_coil & sub_carrier1) | (~new_mod_sig_coil & sub_carrier2)) & mod_type == `TAGSIM_MOD2
+					| (mod_sig_coil & sub_carrier) & (mod_type == `TAGSIM_MOD)) ;
 
 // This is all LF, so doesn't matter.
 assign pwr_oe2 = 1'b0;

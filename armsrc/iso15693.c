@@ -1504,7 +1504,7 @@ static int SendIso15693Answer(uint8_t *resp, int respLen, int delay)
 	uint8_t b = 0;
 	uint8_t sof[] = {0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0xff };
 	uint8_t eof[] = {0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00 };
-	// return 0;
+	// uint8_t *recvbuf = (uint8_t*)BigBuf , recvlen = 0;
 	// Modulate Manchester
 	// FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD423);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD);
@@ -1516,6 +1516,7 @@ static int SendIso15693Answer(uint8_t *resp, int respLen, int delay)
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			(void)b;
+			// recvbuf[recvlen++] = b;
 		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			if(d < delay) {
@@ -1539,6 +1540,7 @@ static int SendIso15693Answer(uint8_t *resp, int respLen, int delay)
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			(void)b;
+			// recvbuf[recvlen++] = b;
 		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			if(i >= respLen) {
@@ -1573,6 +1575,7 @@ static int SendIso15693Answer(uint8_t *resp, int respLen, int delay)
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			(void)b;
+			// recvbuf[recvlen++] = b;
 		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			if(i >= 8) {
@@ -1589,6 +1592,7 @@ static int SendIso15693Answer(uint8_t *resp, int respLen, int delay)
 		}
 	}
 
+	// Dbhexdump(recvlen, recvbuf, false);
 
 	return 0;
 }
@@ -1778,7 +1782,7 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 // 	// Build a suitable reponse to the reader INVENTORY cocmmand
 // 	CodeIso15693TagAnswer(cmdRespInventory, sizeof(cmdRespInventory));
 // 	memcpy(respInventory, ToSend, ToSendMax); respInventoryLen = ToSendMax;
-// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax);
+// 	if (DEBUG) Dbprintf("BigBuf Used : %d",ToSendMax);
 
 // 	// Respond SOF -- takes 8 bytes
 // 	uint8_t *respGetSystemInfo = (respInventory + ToSendMax );
@@ -1786,14 +1790,14 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 // 	// Get System Info
 // 	CodeIso15693TagAnswer(cmdRespGetSystemInfo, sizeof(cmdRespGetSystemInfo));
 // 	memcpy(respGetSystemInfo, ToSend, ToSendMax); respGetSystemInfoLen = ToSendMax;
-// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	if (DEBUG) Dbprintf("BigBuf Used : %d",ToSendMax );
 // // ReadSingleBlock
 // 	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
 // 	uint8_t *respReadSingleBlock = (respGetSystemInfo + ToSendMax );
 // 	int respReadSingleBlockLen;
 // 	CodeIso15693TagAnswer(cmdRespReadSinglBlock, sizeof(cmdRespReadSinglBlock));
 // 	memcpy(respReadSingleBlock, ToSend, ToSendMax); respReadSingleBlockLen = ToSendMax;
-// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	if (DEBUG) Dbprintf("BigBuf Used : %d",ToSendMax );
 
 	
 // 	// 176: Takes 16 bytes for SOF/EOF and 10 * 16 = 160 bytes (2 bytes/bit)
@@ -1801,28 +1805,28 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 // 	int resp3Len;
 // 	CodeIso15693TagAnswer(cmdRespReadSinglBlockWithSecStatus, sizeof(cmdRespReadSinglBlockWithSecStatus));
 // 	memcpy(resp3, ToSend, ToSendMax); resp3Len = ToSendMax;
-// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	if (DEBUG) Dbprintf("BigBuf Used : %d",ToSendMax );
 	
 // 	//
 // 	uint8_t *respOK = (resp3 + ToSendMax );
 // 	int respOKLen;
 // 	CodeIso15693TagAnswer(cmdRespOK, sizeof(cmdRespOK));
 // 	memcpy(respOK, ToSend, ToSendMax); respOKLen = ToSendMax;
-// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	if (DEBUG) Dbprintf("BigBuf Used : %d",ToSendMax );
 
 // 	//
 // 	uint8_t *respError = (respOK + ToSendMax );
 // 	int respErrorLen;
 // 	CodeIso15693TagAnswer(cmdRespError, sizeof(cmdRespError));
 // 	memcpy(respError, ToSend, ToSendMax); respErrorLen = ToSendMax;
-// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	if (DEBUG) Dbprintf("BigBuf Used : %d",ToSendMax );
 
 // 	//
 // 	uint8_t *respMulBlockSecStatus = (respError + ToSendMax );
 // 	int respMulBlockSecStatusLen;
 // 	CodeIso15693TagAnswer(cmdRespMulBlockSecStatus, sizeof(cmdRespMulBlockSecStatus));
 // 	memcpy(respMulBlockSecStatus, ToSend, ToSendMax); respMulBlockSecStatusLen = ToSendMax;
-// 	if (DEBUG) Dbprintf("cmdRespMulBlockSecStatus Bigbuf Used : %d",ToSendMax );
+// 	if (DEBUG) Dbprintf("cmdRespMulBlockSecStatus BigBuf Used : %d",ToSendMax );
 
 // 	//
 // 	// uint8_t *respReadMulBlock = (respMulBlockSecStatus + ToSendMax );
@@ -1830,7 +1834,7 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 // 	int respReadMulBlockLen;
 // 	CodeIso15693TagAnswer(cmdRespReadMulBlock, sizeof(cmdRespReadMulBlock));
 // 	memcpy(respReadMulBlock, ToSend, ToSendMax); respReadMulBlockLen = ToSendMax;
-// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	if (DEBUG) Dbprintf("BigBuf Used : %d",ToSendMax );
 
 
 	uint8_t cmdRespReadBlockFromMap[TOTAL_BLOCKS][8] = { {/*Flags*/0x00,/*data*/ 0x00, 0x00, 0x00, 0x00, /*CRC*/ 0x00, 0x00}  };
@@ -1843,7 +1847,7 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 // 		memcpy(&respReadBlockFromMap[i*ToSendMax], ToSend, ToSendMax);
 	}
 // 	int respReadBlockFromMapLen = ToSendMax;
-// 	if (DEBUG) Dbprintf("Bigbuf Used : %d",ToSendMax );
+// 	if (DEBUG) Dbprintf("BigBuf Used : %d",ToSendMax );
 
 	// + 1720..
   uint8_t *receivedCmd = (((uint8_t *)BigBuf) + RECV_CMD_OFFSET);

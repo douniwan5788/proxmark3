@@ -65,10 +65,44 @@ module hi_iso14443a_tb  ;
     adc_d = adc?{$random}%20 + 192 : 0;  //deep_modultion
   end
 
+  // reg [2:0] out_counter;
   reg [4:0] out_counter;
-  always @(posedge ssp_clk) begin
-    out_counter = out_counter +1;
-    ssp_dout = out_counter[4] ? 1'd1:1'd0;
+  reg [7:0] rx;
+  reg issend;
+  reg [7:0] send_buf;
+
+// sample data at rising edge of ssp_clk - ssp_dout changes at the falling edge.
+  always @(negedge ssp_clk) begin
+    if ( mod_type == `TAGSIM_MOD2)
+      out_counter <= out_counter - 1;
+    else
+      out_counter <= out_counter + 1;
+
+    if(issend) begin
+      ssp_dout <= ~send_buf[out_counter];
+      // ssp_dout <= 1;
+      // ssp_dout <= ~out_counter[0];
+    end
+    else begin
+      ssp_dout <= out_counter[4];
+    end
+
+    rx[7:1] <= rx[6:0];
+    rx[0] <= ssp_din;
+  end
+
+  always @(posedge ssp_frame)
+  begin
+    if(rx == 8'b1)
+    begin
+      issend <= 1;
+      out_counter <= 7;
+      send_buf <= send_buf + 1;
+    end
+    else
+    begin
+      issend <= 0;
+    end
   end
 
   initial begin
@@ -78,8 +112,10 @@ module hi_iso14443a_tb  ;
     ssp_dout = 0;
     out_counter = 0;
 
+    send_buf = 8'h00;
+
     mod_type = `TAGSIM_LISTEN; //TAGSIM_LISTEN
-    #32 mod_type = `TAGSIM_MOD; //TAGSIM_MOD
+    #32 mod_type = `TAGSIM_MOD2; //TAGSIM_MOD
   end
 
 endmodule
