@@ -47,9 +47,9 @@ module fifo_8in_1out(
 	dout,
 	empty,
 	full,
+	overflow,
 	prog_empty,
-	rd_data_count,
-	wr_data_count);
+	underflow);
 
 
 input [7 : 0] din;
@@ -61,9 +61,9 @@ input wr_en;
 output [0 : 0] dout;
 output empty;
 output full;
+output overflow;
 output prog_empty;
-output [6 : 0] rd_data_count;
-output [3 : 0] wr_data_count;
+output underflow;
 
 // synthesis translate_off
 
@@ -84,15 +84,15 @@ output [3 : 0] wr_data_count;
 		.C_HAS_DATA_COUNT(0),
 		.C_HAS_INT_CLK(0),
 		.C_HAS_MEMINIT_FILE(0),
-		.C_HAS_OVERFLOW(0),
-		.C_HAS_RD_DATA_COUNT(1),
+		.C_HAS_OVERFLOW(1),
+		.C_HAS_RD_DATA_COUNT(0),
 		.C_HAS_RD_RST(0),
 		.C_HAS_RST(1),
 		.C_HAS_SRST(0),
-		.C_HAS_UNDERFLOW(0),
+		.C_HAS_UNDERFLOW(1),
 		.C_HAS_VALID(0),
 		.C_HAS_WR_ACK(0),
-		.C_HAS_WR_DATA_COUNT(1),
+		.C_HAS_WR_DATA_COUNT(0),
 		.C_HAS_WR_RST(0),
 		.C_IMPLEMENTATION_TYPE(2),
 		.C_INIT_WR_PNTR_VAL(0),
@@ -137,9 +137,9 @@ output [3 : 0] wr_data_count;
 		.DOUT(dout),
 		.EMPTY(empty),
 		.FULL(full),
+		.OVERFLOW(overflow),
 		.PROG_EMPTY(prog_empty),
-		.RD_DATA_COUNT(rd_data_count),
-		.WR_DATA_COUNT(wr_data_count),
+		.UNDERFLOW(underflow),
 		.CLK(),
 		.INT_CLK(),
 		.BACKUP(),
@@ -156,11 +156,11 @@ output [3 : 0] wr_data_count;
 		.ALMOST_EMPTY(),
 		.ALMOST_FULL(),
 		.DATA_COUNT(),
-		.OVERFLOW(),
 		.PROG_FULL(),
 		.VALID(),
-		.UNDERFLOW(),
+		.RD_DATA_COUNT(),
 		.WR_ACK(),
+		.WR_DATA_COUNT(),
 		.SBITERR(),
 		.DBITERR());
 

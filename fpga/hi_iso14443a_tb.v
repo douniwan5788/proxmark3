@@ -98,7 +98,11 @@ module hi_iso14443a_tb  ;
     begin
       issend <= 1;
       out_counter <= 7;
-      send_buf <= send_buf +1;
+      if(send_buf >= 8'd4) begin
+        send_buf <= 8'hff;
+      end
+      else
+        send_buf <= send_buf +1;
     end
     else
     begin

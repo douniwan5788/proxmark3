@@ -45,12 +45,12 @@ fifo_8in_1out fifo(
 	.rst(fifo_rst),
 	.wr_clk(fifo_wr_clk),
 	.wr_en(fifo_wr_en),
-	.prog_empty(fifo_prog_empty),
 	.dout(fifo_dout),
 	.empty(fifo_empty),
 	.full(fifo_full),
-      .rd_data_count(fifo_rd_data_count),
-      .wr_data_count(fifo_wr_data_count)
+	.overflow(fifo_overflow),
+	.prog_empty(fifo_prog_empty),
+	.underflow(fifo_underflow)
 	);
 
 
@@ -293,35 +293,6 @@ end
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// PM3 -> Tag:
-// a delay line to ensure that we send the (emulated) tag's answer at the correct time according to ISO14443-3
-reg [31:0] mod_sig_buf;
-reg [4:0] mod_sig_ptr;
-reg mod_sig;
-
-always @(negedge adc_clk)
-begin
-	if(negedge_cnt[4:0] == 5'd0) 	// sample data at rising edge of ssp_clk - ssp_dout changes at the falling edge.
-	begin
-		mod_sig_buf[31:2] <= mod_sig_buf[30:1];  			// shift
-
-		if (~ssp_dout && ~mod_sig_buf[1])
-			mod_sig_buf[1] <= 1'b0;							// delete the correction bit (a single 1 preceded and succeeded by 0)
-		else
-			mod_sig_buf[1] <= mod_sig_buf[0];
-
-		mod_sig_buf[0] <= ssp_dout;							// add new data to the delay line
-		mod_sig = mod_sig_buf[mod_sig_ptr];					// the delayed signal.
-	end
-
-	if(negedge_cnt[3:0] == 4'd0)
-	begin
-		recv_buf[7:1] <= recv_buf[6:0];		//recv_buf <<= 1
-		recv_buf[0] <= ssp_dout;
-	end
-end
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // PM3 -> Tag, internal timing:
 // a timer for the 1172 cycles fdt (Frame Delay Time). Start the timer with a rising edge of the reader's signal.
 // set fdt_elapsed when we no longer need to delay data. Set fdt_indicator when we can start sending data.
@@ -384,8 +355,44 @@ begin
 	if(fdt_counter == `FDT_INDICATOR_COUNT) fdt_indicator <= 1'b1;
 end
 
-reg [3:0]rst_count;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PM3 -> Tag:
+// a delay line to ensure that we send the (emulated) tag's answer at the correct time according to ISO14443-3
+reg [31:0] mod_sig_buf;
+reg [4:0] mod_sig_ptr;
+reg mod_sig;
+reg wr_en;
 
+always @(negedge adc_clk)
+begin
+	if(negedge_cnt[4:0] == 5'd0) 	// sample data at rising edge of ssp_clk - ssp_dout changes at the falling edge.
+	begin
+		mod_sig_buf[31:2] <= mod_sig_buf[30:1];  			// shift
+
+		if (~ssp_dout && ~mod_sig_buf[1])
+			mod_sig_buf[1] <= 1'b0;							// delete the correction bit (a single 1 preceded and succeeded by 0)
+		else
+			mod_sig_buf[1] <= mod_sig_buf[0];
+
+		mod_sig_buf[0] <= ssp_dout;							// add new data to the delay line
+		mod_sig = mod_sig_buf[mod_sig_ptr];					// the delayed signal.
+	end
+
+	if(negedge_cnt[3:0] == 4'd0)
+	begin
+		recv_buf[7:1] <= recv_buf[6:0];		//recv_buf <<= 1
+		recv_buf[0] <= ssp_dout;
+		if(recv_buf[3:0] == 4'hf) begin
+			wr_en <=0;
+		end
+	end
+	if(fdt_reset) begin
+		wr_en <=1;
+	end
+end
+
+
+reg [3:0]rst_count;
 reg init_fifo_wr_clk;
 
 always @(negedge adc_clk)
@@ -726,7 +733,7 @@ assign fifo_rd_en = 1;
 assign fifo_rd_clk = ( (init_rd_clk_count > 0 && init_rd_clk_count < 6 ) ? ssp_clk :half_bit_send_over ) & (mod_type == `TAGSIM_MOD2);
 // assign fifo_rd_clk = half_bit_send_over & (mod_type == `TAGSIM_MOD2);
 
-assign fifo_wr_en = 1;
+assign fifo_wr_en = wr_en;
 assign fifo_wr_clk = ( ssp_frame & (init_fifo_wr_clk | data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
 // assign fifo_wr_clk = ( (ssp_frame & data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
 
@@ -757,7 +764,7 @@ assign sub_carrier = ~sub_carrier_cnt[4];
 // wire old_pwr_oe4;
 // assign old_pwr_oe4 = ~( (mod_sig_coil & sub_carrier) & (mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2) );
 assign pwr_oe4 = ~( (((new_mod_sig_coil & sub_carrier1) | (~new_mod_sig_coil & sub_carrier2)) & (mod_type == `TAGSIM_MOD2)
-					| (new_mod_sig_coil & sub_carrier1) & (mod_type == `TAGSIM_MOD) & ~fifo_empty) );
+					| (new_mod_sig_coil & sub_carrier1) & (mod_type == `TAGSIM_MOD) ) & ~fifo_underflow );
 
 // This is all LF, so doesn't matter.
 assign pwr_oe2 = 1'b0;
