@@ -79,12 +79,13 @@ module hi_iso14443a_tb  ;
       out_counter <= out_counter + 1;
 
     if(issend) begin
-      ssp_dout <= ~send_buf[out_counter];
+      ssp_dout <= send_buf[out_counter];
       // ssp_dout <= 1;
       // ssp_dout <= ~out_counter[0];
     end
     else begin
-      ssp_dout <= out_counter[4];
+      // ssp_dout <= out_counter[4];
+      ssp_dout <= 0;
     end
 
     rx[7:1] <= rx[6:0];
@@ -93,11 +94,11 @@ module hi_iso14443a_tb  ;
 
   always @(posedge ssp_frame)
   begin
-    if(rx == 8'b1)
+    if(rx ==1)
     begin
       issend <= 1;
       out_counter <= 7;
-      send_buf <= send_buf + 1;
+      send_buf <= send_buf +1;
     end
     else
     begin

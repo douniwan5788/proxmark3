@@ -106,7 +106,7 @@ void SetAdcMuxFor(uint32_t whichGpio);
 #define FPGA_HF_ISO14443A_TAGSIM_MOD				(2<<0)
 #define FPGA_HF_ISO14443A_READER_LISTEN				(3<<0)
 #define FPGA_HF_ISO14443A_READER_MOD				(4<<0)
-#define FPGA_HF_ISO14443A_TAGSIM_MOD423				(5<<0)
+#define FPGA_HF_ISO14443A_TAGSIM_MOD2				(5<<0)
 
 /// lfops.h
 void AcquireRawAdcSamples125k(int divisor);

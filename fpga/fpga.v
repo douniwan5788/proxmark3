@@ -48,8 +48,8 @@ module fpga(
 // 	);
 // assign spck = spcki;
 IBUFG #(.IOSTANDARD("DEFAULT") ) spckb(
-	.O(spck),
-	.I(spcki)
+	.I(spcki),
+	.O(spck)
 );
 
 

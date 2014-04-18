@@ -273,10 +273,9 @@ int CmdHF15Reader(const char *Cmd)
 	return 0;
 }
 
-// Simulation is still not working very good
 int CmdHF15Sim(const char *Cmd)
 {
-	uint8_t AFI = 0, DSFID = 0, EAS = 0, i;
+	uint8_t AFI = 0, DSFID = 0, EAS_SubCarrier = 0, i;
 	uint8_t UID[8] = {0, 0, 0, 0, 0, 0x01, 0x04, 0xE0};
 	char filename[256] = {"vicc_memory_map.bin"}, C;
 
@@ -300,7 +299,11 @@ int CmdHF15Sim(const char *Cmd)
 			break;
 		case 'e':
 		case 'E':
-			EAS = param_get8ex(Cmd, ++i, 0, 16);
+			EAS_SubCarrier |= 0x01;
+			break;	
+		case 'c':
+		case 'C':
+			EAS_SubCarrier |= 0x02;
 			break;	
 		case 'm':
 		case 'M':
@@ -310,15 +313,19 @@ int CmdHF15Sim(const char *Cmd)
 			}
 			break;
 		default:
-			PrintAndLog("Usage:  hf 15 sim  [u UID (16 hex symbols)] [a AFI ] [d DSFID] [e EAS] [m vicc_memory_map.bin]");
-			PrintAndLog("        UID[6] is used as 'IC reference' responsed in Get system information Cmd");
-			PrintAndLog("        Simulate blocks in vicc_memory_map.bin");
-			PrintAndLog("        sample: hf 15 sim 031FEC8AF7FF12E0");
+			PrintAndLog("Usage:  hf 15 sim  [u UID (16 hex symbols)] [a AFI ] [d DSFID] [e] [c] [m vicc_memory_map.bin] ");
+			PrintAndLog("        u UID		UID[6] is used as 'IC reference' which will response in Get system information Cmd");
+			PrintAndLog("        a AFI		Set the AFI in ISO15693-3");
+			PrintAndLog("        d DSFID	Set the DSFID in ISO15693-3");
+			PrintAndLog("        e 			Active EAS (use NXP ICODE2 bit sequence)");
+			PrintAndLog("        c 			Use two-subcarriers mode");
+			PrintAndLog("        m file		Use `file` as vicc memory blocks, format: {security 1byte, data 5bytes} * 0x1C blocks");
+			PrintAndLog("        sample: hf 15 sim 031FEC8AF7FF12E0 a 01 d 02");
 			return 0;
 		}
 	}
 
-	UsbCommand c = {CMD_SIMTAG_ISO_15693, {AFI, DSFID, EAS}};
+	UsbCommand c = {CMD_SIMTAG_ISO_15693, {AFI, DSFID, EAS_SubCarrier}};
 	memcpy(c.d.asBytes, UID, 8);
 
 	FILE *f = fopen(filename, "r");
@@ -335,7 +342,10 @@ int CmdHF15Sim(const char *Cmd)
 	fclose(f);
 
 
-	PrintAndLog("--AFI:%02x --DSFID:%02x --EAS:%02x UID:%s VICC Memory map:%s", AFI, DSFID, EAS, sprint_hex(UID, 8), filename);
+	PrintAndLog("--AFI:%02x --DSFID:%02x --EAS:%s --SubCarrier:%s UID:%s VICC Memory map:%s", AFI, DSFID,
+	EAS_SubCarrier & 0x01 ? "Actived":"Deactive",
+	EAS_SubCarrier & 0x02 ? "Two":"One",
+	sprint_hex(UID, 8), filename);
 
 	SendCommand(&c);
 	return 0;

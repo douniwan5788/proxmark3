@@ -384,29 +384,36 @@ begin
 	if(fdt_counter == `FDT_INDICATOR_COUNT) fdt_indicator <= 1'b1;
 end
 
-// reg [3:0]rst_count;
+reg [3:0]rst_count;
 
-// wire rst_clk;
-// assign rst_clk = ssp_clk;
+reg init_fifo_wr_clk;
 
-// always @(negedge rst_clk)
-// begin
-// 	if(fdt_counter >= `INIT_DURING_FDT_COUNT)
-// 	begin
-// 		if(rst_count < 15) begin
-// 			rst_count <= rst_count + 1;
+always @(negedge adc_clk)
+begin
+	// on ssp_clk negedge
+	if(mod_type == `TAGSIM_MOD2) begin
+		if(negedge_cnt[6:0] == 7'h40 ) begin
+			if(rst_count < 15) begin
+				rst_count <= rst_count + 1;
 
-// 			if(rst_count == 0) begin
-// 				fifo_rst = 1;
-// 			end
-// 			if(rst_count == 1) begin
-// 				fifo_rst = 0;
-// 			end
-// 		end
-// 	end
-// 	else
-// 		rst_count <= 0;
-// end
+				case (rst_count)
+				0:	fifo_rst <= 1;
+				1:	begin
+					fifo_rst <= 0;
+					init_fifo_wr_clk <=1;
+				end
+				5:	init_fifo_wr_clk <=0;
+				default:
+					fifo_rst <= 0;
+				endcase
+			end
+		end
+	end
+	else begin
+		rst_count <= 0;
+		init_fifo_wr_clk <=0;
+	end
+end
 
 
 
@@ -507,6 +514,7 @@ begin
 		end
 		else if(mod_type == `TAGSIM_MOD2)
 		begin
+			// to_arm[7:0] <= (fifo_prog_empty & fdt_indicator) ? recv_buf[7:0] : 8'd0;
 			to_arm[7:0] <= fifo_prog_empty & fdt_indicator;
 			data_coming[2:1] <= data_coming[1:0];
 			data_coming[0] <= fifo_prog_empty & fdt_indicator;
@@ -640,7 +648,7 @@ reg sub_carrier1;
 reg [4:0] sub_carrier_halfpulse_counter1;
 always @(negedge adc_clk )
 begin
-    if(mod_type == `TAGSIM_MOD2 && new_mod_sig_coil == 1'd1)
+    if(mod_type == `TAGSIM_MOD2 && new_mod_sig_coil == 1'd1 || mod_type == `TAGSIM_MOD)
     begin
         if(sub_carrier_cnt - pre_sub_carrier_cnt1 == 8'd16 || 'd223 + sub_carrier_cnt - pre_sub_carrier_cnt1 == 8'd16)
         begin
@@ -695,8 +703,10 @@ end
 
 
 wire half_bit_send_over;
-assign half_bit_send_over = ((sub_carrier_halfpulse_counter1 >= 5'd15 || sub_carrier_halfpulse_counter2 >= 5'd17) & fdt_elapsed)
+assign half_bit_send_over = (((sub_carrier_halfpulse_counter1 >= 5'd15 | sub_carrier_halfpulse_counter2 >= 5'd17) & fdt_elapsed & (mod_type == `TAGSIM_MOD2) )
+							| sub_carrier_halfpulse_counter1 >= 5'd15 & (mod_type == `TAGSIM_MOD))
 							| ( (fdt_counter > `FIRST_RD_CLK_FDT_COUNT) & ~fdt_elapsed );
+
 // assign half_bit_send_over = (sub_carrier_halfpulse_counter1 >= 5'd16 || sub_carrier_halfpulse_counter2 <= 5'd9) ||
 // 							(sub_carrier_halfpulse_counter2 >= 5'd18 || sub_carrier_halfpulse_counter1 <= 5'd8 );
 
@@ -713,12 +723,12 @@ begin
 end
 
 assign fifo_rd_en = 1;
-assign fifo_rd_clk = ( (init_rd_clk_count > 0 && init_rd_clk_count < 3 ) ? ssp_clk :half_bit_send_over ) & (mod_type == `TAGSIM_MOD2);
+assign fifo_rd_clk = ( (init_rd_clk_count > 0 && init_rd_clk_count < 6 ) ? ssp_clk :half_bit_send_over ) & (mod_type == `TAGSIM_MOD2);
 // assign fifo_rd_clk = half_bit_send_over & (mod_type == `TAGSIM_MOD2);
 
 assign fifo_wr_en = 1;
-// assign fifo_wr_clk = ( (rst_count > 0 && rst_count < 5 )? rst_clk : (ssp_frame & data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
-assign fifo_wr_clk = ( (ssp_frame & data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
+assign fifo_wr_clk = ( ssp_frame & (init_fifo_wr_clk | data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
+// assign fifo_wr_clk = ( (ssp_frame & data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
 
 always @(negedge half_bit_send_over)
 begin
@@ -746,8 +756,8 @@ assign sub_carrier = ~sub_carrier_cnt[4];
 // for pwr_oe4 = 0 (active):   antenna load = 10k || 33 || 33  	= 16,5 Ohms
 // wire old_pwr_oe4;
 // assign old_pwr_oe4 = ~( (mod_sig_coil & sub_carrier) & (mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2) );
-assign pwr_oe4 = ~( ((new_mod_sig_coil & sub_carrier1) | (~new_mod_sig_coil & sub_carrier2)) & mod_type == `TAGSIM_MOD2
-					| (mod_sig_coil & sub_carrier) & (mod_type == `TAGSIM_MOD)) ;
+assign pwr_oe4 = ~( (((new_mod_sig_coil & sub_carrier1) | (~new_mod_sig_coil & sub_carrier2)) & (mod_type == `TAGSIM_MOD2)
+					| (new_mod_sig_coil & sub_carrier1) & (mod_type == `TAGSIM_MOD) & ~fifo_empty) );
 
 // This is all LF, so doesn't matter.
 assign pwr_oe2 = 1'b0;

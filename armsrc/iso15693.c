@@ -1498,93 +1498,143 @@ void ReaderIso15693(uint32_t parameter)
 // 	LED_C_OFF();
 // 	LED_D_OFF();
 // }
-static int SendIso15693Answer(uint8_t *resp, int respLen, int delay)
+static int SendIso15693Answer(uint8_t two_subcarrier, uint8_t *resp, int respLen, int delay)
 {
 	int i = 0, u = 0, d = 0, j = 0, sendbyte = 0, sendbit = 0;
 	uint8_t b = 0;
-	uint8_t sof[] = {0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0xff };
-	uint8_t eof[] = {0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00 };
-	// uint8_t *recvbuf = (uint8_t*)BigBuf , recvlen = 0;
+	// uint8_t sof[] = {0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0xff };
+	// uint8_t eof[] = {0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00 };
+	uint8_t *recvbuf = (uint8_t*)BigBuf , recvlen = 0;
 	// Modulate Manchester
-	// FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD423);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD);
+	if (two_subcarrier)
+	{
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD2);
+	} else {
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD);	
+	}
+	
 	AT91C_BASE_SSC->SSC_THR = 0x00;
 	FpgaSetupSsc();
 	
-	// send sof
+	// // send sof
+	// for(;;) {
+	// 	if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
+	// 		volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+	// 		(void)b;
+	// 		// recvbuf[recvlen++] = b;
+	// 	}
+	// 	if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
+	// 		if(d < delay) {
+	// 			b = 0x00;
+	// 			d++;
+	// 		} else if(i >= 8) {
+	// 			break;
+	// 		} else {				
+	// 			b = sof[i];
+	// 			u++;
+	// 			if(u > 1) { i++; u = 0; }
+	// 		}
+	// 		AT91C_BASE_SSC->SSC_THR = b;
+	// 	}
+	// }
+
+	// i = 0, u = 0;
+	// // send cycle
+	// sendbyte = resp[0];
+	// for(;;) {
+	// 	if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
+	// 		volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+	// 		(void)b;
+	// 		// recvbuf[recvlen++] = b;
+	// 	}
+	// 	if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
+	// 		if(i >= respLen) {
+	// 			break;
+	// 		} else {
+	// 			sendbit = (sendbyte >>(j>>1)) & 1;
+
+	// 			b = sendbit ^ (j&1) ? 0x00:0xff;
+
+	// 			u++;
+	// 			if(u > 1) {
+	// 				u = 0; 
+	// 				if (++j == 16) {
+	// 					j=0;
+	// 					i++;
+	// 					sendbyte = resp[i];
+	// 				}
+	// 			}
+	// 		}
+	// 		AT91C_BASE_SSC->SSC_THR = b;
+
+	// 		if(u > 4) break;
+	// 	}
+	// 	if(BUTTON_PRESS()) {
+	// 		return 1;
+	// 	}
+	// }
+
+	// i = 0, u = 0;
+	// // send eof
+	// for(;;) {
+	// 	if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
+	// 		volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+	// 		(void)b;
+	// 		// recvbuf[recvlen++] = b;
+	// 	}
+	// 	if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
+	// 		if(i >= 8) {
+	// 			b = 0x00;
+	// 			u++;
+	// 		} else {
+	// 			b = eof[i];
+	// 			u++;
+	// 			if(u > 1) { i++; u = 0; }
+	// 		}
+	// 		AT91C_BASE_SSC->SSC_THR = b;
+
+	// 		if(u > 4) break;
+	// 	}
+	// }
+
+	// Dbhexdump(recvlen, recvbuf, false);
+
+	// 
+	sendbit = 0x1D; //sof
+	volatile uint8_t shouldSend = 0;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			(void)b;
-			// recvbuf[recvlen++] = b;
+			shouldSend = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+			recvbuf[recvlen++] = shouldSend;
 		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			if(d < delay) {
 				b = 0x00;
 				d++;
-			} else if(i >= 8) {
-				break;
-			} else {				
-				b = sof[i];
-				u++;
-				if(u > 1) { i++; u = 0; }
-			}
-			AT91C_BASE_SSC->SSC_THR = b;
-		}
-	}
-
-	i = 0, u = 0;
-	// send cycle
-	sendbyte = resp[0];
-	for(;;) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			(void)b;
-			// recvbuf[recvlen++] = b;
-		}
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			if(i >= respLen) {
-				break;
-			} else {
-				sendbit = (sendbyte >>(j>>1)) & 1;
-
-				b = sendbit ^ (j&1) ? 0x00:0xff;
-
-				u++;
-				if(u > 1) {
-					u = 0; 
-					if (++j == 16) {
-						j=0;
-						i++;
-						sendbyte = resp[i];
-					}
-				}
-			}
-			AT91C_BASE_SSC->SSC_THR = b;
-
-			if(u > 4) break;
-		}
-		if(BUTTON_PRESS()) {
-			return 1;
-		}
-	}
-
-	i = 0, u = 0;
-	// send eof
-	for(;;) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			volatile uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			(void)b;
-			// recvbuf[recvlen++] = b;
-		}
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			if(i >= 8) {
+			} else if(i > respLen) {
 				b = 0x00;
 				u++;
-			} else {
-				b = eof[i];
-				u++;
-				if(u > 1) { i++; u = 0; }
+			} else {				
+				if (shouldSend)
+				{
+					b = sendbit;
+
+					sendbyte = (resp[i] >> j) & 0xf;
+
+					sendbit = sendbyte & 0x8 ? 0x40:0x80;
+					sendbit |= sendbyte & 0x4 ? 0x10:0x20;
+					sendbit |= sendbyte & 0x2 ? 0x4:0x8;
+					sendbit |= sendbyte & 0x1 ? 0x1:0x2;
+
+					j+=4;
+					if (j >=8)
+					{
+						j = 0;
+						if (++i >=respLen)
+							sendbit = 0xB0;	//EOF
+					}
+				} else 
+					b = 0;
 			}
 			AT91C_BASE_SSC->SSC_THR = b;
 
@@ -1592,7 +1642,9 @@ static int SendIso15693Answer(uint8_t *resp, int respLen, int delay)
 		}
 	}
 
-	// Dbhexdump(recvlen, recvbuf, false);
+	Dbhexdump(respLen, resp, false);
+
+	Dbhexdump(recvlen, recvbuf, false);
 
 	return 0;
 }
@@ -1694,7 +1746,7 @@ struct card_memory{
 
 }__attribute__((packed)) ;
 
-void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
+void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas_subcarrier, uint8_t *datain)
 {
 	struct card_memory *map = (struct card_memory*)datain;
 
@@ -1702,6 +1754,9 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 	tracing = TRUE;
 	traceLen = 0;
 	memset(trace, 0x44, TRACE_SIZE);	
+
+	uint8_t easActived = eas_subcarrier & 0x01;
+	uint8_t two_subcarrier = eas_subcarrier & 0x02;
 
 	// Responses
   	uint8_t cmdRespInventory[] = { /*Flags*/0x00, /*DSFID*/dsfid, /*UID*/0x12, 0x34, 0x56, 0x78, 0x00 ,0x01, 0x04, 0xe0,/*CRC*/ 0x00, 0x00 };
@@ -1924,7 +1979,7 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 	    	//  Get multiple block security status 
 	        respdata = cmdRespMulBlockSecStatus;
 	        respsize = sizeof(cmdRespMulBlockSecStatus);
-		} else if (len > 2 && receivedCmd[1] == 0xA5 && receivedCmd[2] == 0x04/*IC Mfg. code*/)	{
+		} else if (easActived && len > 2 && receivedCmd[1] == 0xA5 && receivedCmd[2] == 0x04/*IC Mfg. code*/)	{
 			respdata = cmdRespEASAlarm;
 	        respsize = sizeof(cmdRespEASAlarm);
 		} else {
@@ -1945,7 +2000,7 @@ void SimTagIso15693(uint32_t afi, uint32_t dsfid, uint32_t eas, uint8_t *datain)
 		}
 
 		if(respsize > 0) {
-			SendIso15693Answer(respdata, respsize, 0);
+			SendIso15693Answer(two_subcarrier, respdata, respsize, 0);
 		}
 
 		// Dbprintf("received from reader (len=%d): %x %x %x %x %x %x %x %x %x",
