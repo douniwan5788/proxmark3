@@ -70,43 +70,45 @@ module hi_iso14443a_tb  ;
   reg [7:0] rx;
   reg issend;
   reg [7:0] send_buf;
+  reg start;
 
 // sample data at rising edge of ssp_clk - ssp_dout changes at the falling edge.
   always @(negedge ssp_clk) begin
-    if ( mod_type == `TAGSIM_MOD2)
+    if(start) begin
       out_counter <= out_counter - 1;
-    else
-      out_counter <= out_counter + 1;
 
-    if(issend) begin
+      if(issend) begin
       ssp_dout <= send_buf[out_counter];
       // ssp_dout <= 1;
-      // ssp_dout <= ~out_counter[0];
-    end
-    else begin
+      // ssp_dout <= out_counter[0];
+      end
+      else begin
       // ssp_dout <= out_counter[4];
       ssp_dout <= 0;
-    end
+      end
 
-    rx[7:1] <= rx[6:0];
-    rx[0] <= ssp_din;
+      rx[7:1] <= rx[6:0];
+      rx[0] <= ssp_din;
+    end
   end
 
   always @(posedge ssp_frame)
   begin
-    if(rx ==1)
-    begin
-      issend <= 1;
-      out_counter <= 7;
-      if(send_buf >= 8'd4) begin
-        send_buf <= 8'hff;
+    if(start) begin
+      if(rx != 8'd0)
+      begin
+        issend <= 1;
+        out_counter <= 7;
+        // if(send_buf >= 8'd10) begin
+        //   send_buf <= 8'hff;
+        // end
+        // else
+          send_buf <= send_buf +1;
       end
       else
-        send_buf <= send_buf +1;
-    end
-    else
-    begin
-      issend <= 0;
+      begin
+        issend <= 0;
+      end
     end
   end
 
@@ -116,11 +118,15 @@ module hi_iso14443a_tb  ;
     adc = 0;
     ssp_dout = 0;
     out_counter = 0;
+    issend = 0;
+    rx=0;
+    start = 0;
 
-    send_buf = 8'h00;
+    send_buf = 8'h01;
 
     mod_type = `TAGSIM_LISTEN; //TAGSIM_LISTEN
-    #32 mod_type = `TAGSIM_MOD2; //TAGSIM_MOD
+    #32 mod_type = `TAGSIM_MOD; //TAGSIM_MOD
+    start = 1;
   end
 
 endmodule

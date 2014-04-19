@@ -40,16 +40,16 @@ vsim optd
 
 
 # add wave -unsi sim:/hi_iso14443a_tb/dut/adc_clk 
-# add wave -unsi sim:/hi_iso14443a_tb/dut/sub_carrier_cnt 
-# add wave -unsi sim:/hi_iso14443a_tb/dut/pre_sub_carrier_cnt1 
-# add wave -unsi sim:/hi_iso14443a_tb/dut/pre_sub_carrier_cnt2
+add wave -unsi sim:/hi_iso14443a_tb/dut/sub_carrier_cnt 
+add wave -unsi sim:/hi_iso14443a_tb/dut/pre_sub_carrier_cnt1 
+add wave -unsi sim:/hi_iso14443a_tb/dut/pre_sub_carrier_cnt2
 
 # add wave -unsi sim:/hi_iso14443a_tb/dut/reg_dbg1
 # add wave -unsi sim:/hi_iso14443a_tb/dut/reg_dbg2
 
-add wave -unsi sim:/hi_iso14443a_tb/dut/mod_sig_coil 
-add wave -unsi sim:/hi_iso14443a_tb/dut/sub_carrier
-add wave -unsi sim:/hi_iso14443a_tb/dut/pwr_oe4 
+# add wave -unsi sim:/hi_iso14443a_tb/dut/mod_sig_coil 
+# add wave -unsi sim:/hi_iso14443a_tb/dut/sub_carrier
+# add wave -unsi sim:/hi_iso14443a_tb/dut/pwr_oe4 
 
 # add wave -unsi sim:/hi_iso14443a_tb/dut/sub_carrier_halfpulse_counter1 
 # add wave -unsi sim:/hi_iso14443a_tb/dut/sub_carrier_halfpulse_counter2 
@@ -67,7 +67,9 @@ add wave -unsi sim:/hi_iso14443a_tb/dut/fdt_indicator
 
 add wave -hex sim:/hi_iso14443a_tb/dut/recv_buf
 add wave -hex sim:/hi_iso14443a_tb/dut/to_arm
+add wave -unsi sim:/hi_iso14443a_tb/dut/ssp_din
 add wave -hex sim:/hi_iso14443a_tb/rx
+add wave -hex sim:/hi_iso14443a_tb/start
 
 
 
@@ -77,7 +79,7 @@ add wave -unsi sim:/hi_iso14443a_tb/dut/init_fifo_wr_clk
 add wave -unsi sim:/hi_iso14443a_tb/dut/fifo/*
 
 
-add wave -unsi sim:/hi_iso14443a_tb/dut/ssp_din
+
 
 
 

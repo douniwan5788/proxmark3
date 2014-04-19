@@ -22,7 +22,7 @@
 `include "util.v"
 
 module fpga(
-	spcki, miso, mosi, ncs,
+	spck, miso, mosi, ncs,
 	pck0, ck_1356meg, ck_1356megb,
 	pwr_lo, pwr_hi, pwr_oe1, pwr_oe2, pwr_oe3, pwr_oe4,
 	adc_d, adc_clk, adc_noe,
@@ -30,7 +30,7 @@ module fpga(
 	cross_hi, cross_lo,
 	dbg
 );
-	input spcki, mosi, ncs;
+	input spck, mosi, ncs;
 	output miso;
 	input pck0, ck_1356meg, ck_1356megb;
 	output pwr_lo, pwr_hi, pwr_oe1, pwr_oe2, pwr_oe3, pwr_oe4;
@@ -48,8 +48,8 @@ module fpga(
 // 	);
 // assign spck = spcki;
 IBUFG #(.IOSTANDARD("DEFAULT") ) spckb(
-	.I(spcki),
-	.O(spck)
+	.I(spck),
+	.O(spcko)
 );
 
 
@@ -75,7 +75,7 @@ begin
 	endcase
 end
 
-always @(posedge spck)
+always @(posedge spcko)
 begin
 	if(~ncs)
 	begin
