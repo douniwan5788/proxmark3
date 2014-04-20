@@ -1500,11 +1500,12 @@ void ReaderIso15693(uint32_t parameter)
 // }
 static int SendIso15693Answer(uint8_t two_subcarrier, uint8_t *resp, int respLen, int delay)
 {
-	int i = 0, u = 0, d = 0, j = 0, sendbyte = 0, sendbit = 0;
+	int i = 0, d = 0, j = 0, sendbyte = 0, sendbit = 0, u = 0;
 	uint8_t b = 0;
 	// uint8_t sof[] = {0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0xff };
 	// uint8_t eof[] = {0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00 };
 	uint8_t *recvbuf = (uint8_t*)BigBuf , recvlen = 0;
+	uint8_t *sendBuf = (uint8_t*)BigBuf+1000 , sendlen = 0;
 	// Modulate Manchester
 	if (two_subcarrier)
 	{
@@ -1606,14 +1607,23 @@ static int SendIso15693Answer(uint8_t two_subcarrier, uint8_t *resp, int respLen
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			shouldSend = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			recvbuf[recvlen++] = shouldSend;
+
+			if (shouldSend != 0x01)
+			{
+				u++;
+			}
+			if (u>=28)
+			{
+				break;
+			}
 		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			if(d < delay) {
 				b = 0x00;
 				d++;
-			} else if(i > respLen) {
-				b = 0x00;
-				u++;
+			} else if(i >= respLen) {
+				b = 0xB8;
+				// u++;
 			} else {				
 				if (shouldSend)
 				{
@@ -1630,21 +1640,26 @@ static int SendIso15693Answer(uint8_t two_subcarrier, uint8_t *resp, int respLen
 					if (j >=8)
 					{
 						j = 0;
-						if (++i >=respLen)
-							sendbit = 0xB0;	//EOF
+						++i;
 					}
 				} else 
 					b = 0;
 			}
 			AT91C_BASE_SSC->SSC_THR = b;
-
-			if(u > 4) break;
+			sendBuf[sendlen++] = b;
+			// if(u > 4) break;
 		}
 	}
 
+	Dbprintf("i:%d j:%d u:%d shouldSend:%02x",i, j, u, shouldSend );
+	DbpString("resp");
 	Dbhexdump(respLen, resp, false);
 
-	Dbhexdump(recvlen, recvbuf, false);
+	DbpString("sendBuf");
+	Dbhexdump(sendlen, sendBuf, false);
+
+	DbpString("recvbuf");
+	Dbhexdump(recvlen + u, recvbuf, false);
 
 	return 0;
 }

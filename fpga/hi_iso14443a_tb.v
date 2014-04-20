@@ -79,12 +79,11 @@ module hi_iso14443a_tb  ;
 
       if(issend) begin
       ssp_dout <= send_buf[out_counter];
-      // ssp_dout <= 1;
+      // ssp_dout <= 0;
       // ssp_dout <= out_counter[0];
       end
       else begin
-      // ssp_dout <= out_counter[4];
-      ssp_dout <= 0;
+        ssp_dout <= 0;
       end
 
       rx[7:1] <= rx[6:0];
@@ -92,6 +91,7 @@ module hi_iso14443a_tb  ;
     end
   end
 
+  reg [7:0]rsp_count;
   always @(posedge ssp_frame)
   begin
     if(start) begin
@@ -99,11 +99,35 @@ module hi_iso14443a_tb  ;
       begin
         issend <= 1;
         out_counter <= 7;
-        // if(send_buf >= 8'd10) begin
-        //   send_buf <= 8'hff;
-        // end
-        // else
-          send_buf <= send_buf +1;
+        rsp_count <= rsp_count + 1;
+        case (rsp_count)
+          1: send_buf <= 8'h1d;
+          2: send_buf <= 8'hAA;
+          3: send_buf <= 8'hAA;
+          4: send_buf <= 8'hAA;
+          5: send_buf <= 8'hAA;
+          6: send_buf <= 8'hAA;
+          7: send_buf <= 8'hAA;
+          8: send_buf <= 8'hAA;
+          9: send_buf <= 8'hAA;
+          10: send_buf <= 8'hAA;
+          11: send_buf <= 8'hAA;
+          12: send_buf <= 8'hAA;
+          13: send_buf <= 8'hAA;
+          14: send_buf <= 8'hAA;
+          15: send_buf <= 8'hAA;
+          16: send_buf <= 8'hA9;
+          17: send_buf <= 8'hAA;
+          18: send_buf <= 8'h9A;
+          19: send_buf <= 8'hAA;
+          20: send_buf <= 8'hAA;
+          21: send_buf <= 8'h56;
+          22: send_buf <= 8'h66;
+          23: send_buf <= 8'h5A;
+          24: send_buf <= 8'h69;
+          25: send_buf <= 8'hB8;
+          default: send_buf <= 8'hB8;
+        endcase
       end
       else
       begin
@@ -122,7 +146,8 @@ module hi_iso14443a_tb  ;
     rx=0;
     start = 0;
 
-    send_buf = 8'h01;
+    rsp_count = 1;
+    send_buf = 8'hb5;
 
     mod_type = `TAGSIM_LISTEN; //TAGSIM_LISTEN
     #32 mod_type = `TAGSIM_MOD; //TAGSIM_MOD

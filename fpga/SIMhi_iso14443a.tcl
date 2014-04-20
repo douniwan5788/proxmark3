@@ -2,7 +2,7 @@ vlog -work work -O0 hi_iso14443a.v
 vlog -work work -O0 hi_iso14443a_tb.v
 vlog -work work -O0 fifo_8in_1out.v
 
-vopt -L xilinxcorelib_ver +acc work.hi_iso14443a_tb -o optd
+vopt -L xilinxcorelib_ver -L unisims_ver +acc work.hi_iso14443a_tb -o optd
 
 vsim optd
 
@@ -96,7 +96,7 @@ add wave sim:/hi_iso14443a_tb/dut/negedge_cnt
 # add wave -unsi sim:/hi_iso14443a_tb/dut/old_pwr_oe4 
 
 view wave
-run 80000ns
+run 130000ns
 
 
 

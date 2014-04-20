@@ -1,3 +1,10 @@
+/* TODO:
+1、bit orded
+2、
+
+*/
+
+
 //-----------------------------------------------------------------------------
 // ISO14443-A support for the Proxmark III
 // Gerhard de Koning Gans, April 2008
@@ -333,6 +340,7 @@ begin
 		fdt_counter <= 11'd0;
 		fdt_elapsed <= 1'b0;
 		fdt_indicator <= 1'b0;
+		sub_carrier_cnt <= 8'd0;
 	end
 	else
 	begin
@@ -381,11 +389,11 @@ end
 
 reg wr_en;
 always @(negedge adc_clk) begin
-	if(negedge_cnt[3:0] == 4'd0)
+	if(negedge_cnt[3:0] == 4'd0)		// rising edge
 	begin
 		recv_buf[7:1] <= recv_buf[6:0];		//recv_buf <<= 1
 		recv_buf[0] <= ssp_dout;
-		if(recv_buf[7:0] == 8'h1d) begin
+		if(recv_buf[7:0] == 8'hb8) begin
 			wr_en <=0;
 		end
 	end
@@ -507,6 +515,7 @@ end
 reg [7:0] to_arm;
 
 reg [2:0] data_coming;
+// reg [7:0] end_count;
 always @(negedge adc_clk)
 begin
 	if(fdt_reset) begin
@@ -527,8 +536,18 @@ begin
 		end
 		else if(tagsim_mod)
 		begin
-			to_arm[7:0] <= (fifo_prog_empty & fdt_indicator) ? (data_coming[1]?recv_buf[6:0]:8'd1 ): 8'd0;
-			// to_arm[7:0] <= fifo_prog_empty & fdt_indicator;
+			if(fifo_empty & ~wr_en) begin
+				// end_count <= end_count + 1;
+				// to_arm[7:0] <= end_count;
+				to_arm[7:0] <= 8'h07;
+			end
+			else
+			begin
+				// end_count <= 8'd7;
+				to_arm[7:0] <= (fifo_prog_empty & fdt_indicator) ? (data_coming[1]?recv_buf[6:0]:8'd1 ): 8'd0;
+				// to_arm[7:0] <=fifo_prog_empty & fdt_indicator;
+			end
+
 			data_coming[2:1] <= data_coming[1:0];
 			data_coming[0] <= fifo_prog_empty & fdt_indicator;
 		end
@@ -682,7 +701,7 @@ begin
         sub_carrier_halfpulse_counter1 <= 4'd0;
     end
 
-	if(fdt_counter == `FDT_COUNT && ~fdt_elapsed) begin
+	if(fdt_reset) begin
 		pre_sub_carrier_cnt1 <= 0;
 		sub_carrier_halfpulse_counter1 <= 0;
 	end
@@ -710,7 +729,7 @@ begin
         sub_carrier2 <= 1'd0;
     end
 
-    if(fdt_counter == `FDT_COUNT && ~fdt_elapsed) begin
+    if(fdt_reset) begin
 		pre_sub_carrier_cnt2 <= 0;
 		sub_carrier_halfpulse_counter2 <= 0;
 	end
@@ -724,6 +743,14 @@ assign half_bit_send_over = (((sub_carrier_halfpulse_counter1 >= 5'd15 | sub_car
 
 // assign half_bit_send_over = (sub_carrier_halfpulse_counter1 >= 5'd16 || sub_carrier_halfpulse_counter2 <= 5'd9) ||
 // 							(sub_carrier_halfpulse_counter2 >= 5'd18 || sub_carrier_halfpulse_counter1 <= 5'd8 );
+
+always @(negedge half_bit_send_over)
+begin
+	if(tagsim_mod)
+	begin
+		new_mod_sig_coil <= fifo_dout;
+	end
+end
 
 reg [3:0] init_rd_clk_count;
 always @(negedge ssp_clk)
@@ -744,14 +771,6 @@ assign fifo_rd_clk = ( (init_rd_clk_count > 0 && init_rd_clk_count < 6 ) ? ssp_c
 assign fifo_wr_en = wr_en;
 assign fifo_wr_clk = ( ssp_frame & (init_fifo_wr_clk | data_coming[2] & fdt_indicator) ) & tagsim_mod;
 // assign fifo_wr_clk = ( (ssp_frame & data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
-
-always @(negedge half_bit_send_over)
-begin
-	if(tagsim_mod)
-	begin
-		new_mod_sig_coil <= fifo_dout;
-	end
-end
 
 
 // in READER_MOD: drop carrier for mod_sig_coil==1 (pause); in READER_LISTEN: carrier always on; in other modes: carrier always off
