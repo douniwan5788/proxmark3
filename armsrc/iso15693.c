@@ -1500,12 +1500,14 @@ void ReaderIso15693(uint32_t parameter)
 // }
 static int SendIso15693Answer(uint8_t two_subcarrier, uint8_t *resp, int respLen, int delay)
 {
-	int i = 0, d = 0, j = 0, sendbyte = 0, sendbit = 0, u = 0;
+	int i = 0, d = 0, j = 0, u = 0, sendbyte = 0, sendbit = 0;
 	uint8_t b = 0;
 	// uint8_t sof[] = {0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0xff };
 	// uint8_t eof[] = {0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00 };
-	uint8_t *recvbuf = (uint8_t*)BigBuf , recvlen = 0;
-	uint8_t *sendBuf = (uint8_t*)BigBuf+1000 , sendlen = 0;
+	uint8_t *recvbuf = (uint8_t*)BigBuf+500;
+	uint8_t *sendBuf = (uint8_t*)BigBuf ;
+	int  recvlen = 0, sendlen = 0;
+
 	// Modulate Manchester
 	if (two_subcarrier)
 	{
@@ -1600,33 +1602,39 @@ static int SendIso15693Answer(uint8_t two_subcarrier, uint8_t *resp, int respLen
 
 	// Dbhexdump(recvlen, recvbuf, false);
 
-	// 
 	sendbit = 0x1D; //sof
 	volatile uint8_t shouldSend = 0;
+	// uint8_t fifo_rd = 0 , fifo_wr=1; //fifo[256] = {1},
+	// uint8_t order[410] = {0}, order_len = 0;
+
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			shouldSend = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			recvbuf[recvlen++] = shouldSend;
-
-			if (shouldSend != 0x01)
+			// // fifo[fifo_wr++] = shouldSend;
+			// fifo_wr++;
+			// order[order_len++] = 2;
+			if (shouldSend != 0x01 )
 			{
 				u++;
 			}
-			if (u>=28)
+			if ( /*u++ >= 410 ||*/ shouldSend == 0x07)
 			{
 				break;
 			}
 		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
+			// order[order_len++] = (fifo_rd < fifo_wr);
+			// fifo_rd++;
 			if(d < delay) {
 				b = 0x00;
 				d++;
 			} else if(i >= respLen) {
 				b = 0xB8;
 				// u++;
-			} else {				
-				if (shouldSend)
-				{
+			} else {
+				// if ( fifo[fifo_rd++] )
+				// {
 					b = sendbit;
 
 					sendbyte = (resp[i] >> j) & 0xf;
@@ -1642,8 +1650,8 @@ static int SendIso15693Answer(uint8_t two_subcarrier, uint8_t *resp, int respLen
 						j = 0;
 						++i;
 					}
-				} else 
-					b = 0;
+				// } else 
+				// 	b = 0;
 			}
 			AT91C_BASE_SSC->SSC_THR = b;
 			sendBuf[sendlen++] = b;
@@ -1652,14 +1660,16 @@ static int SendIso15693Answer(uint8_t two_subcarrier, uint8_t *resp, int respLen
 	}
 
 	Dbprintf("i:%d j:%d u:%d shouldSend:%02x",i, j, u, shouldSend );
-	DbpString("resp");
-	Dbhexdump(respLen, resp, false);
+	
+	// DbpString("order");
+	// Dbhexdump(order_len, order, false);
 
 	DbpString("sendBuf");
 	Dbhexdump(sendlen, sendBuf, false);
 
 	DbpString("recvbuf");
-	Dbhexdump(recvlen + u, recvbuf, false);
+	Dbhexdump(recvlen , recvbuf, false);
+	DbpString("\n");
 
 	return 0;
 }

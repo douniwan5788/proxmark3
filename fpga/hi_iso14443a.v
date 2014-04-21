@@ -45,6 +45,7 @@ wire tagsim_mod = (mod_type == `TAGSIM_MOD || mod_type == `TAGSIM_MOD2);
 
 reg [7:0] recv_buf;
 reg fifo_rst;
+reg fifo_wr_en;
 
 fifo_8in_1out fifo(
 	.din(recv_buf),
@@ -387,24 +388,24 @@ begin
 	end
 end
 
-reg wr_en;
 always @(negedge adc_clk) begin
 	if(negedge_cnt[3:0] == 4'd0)		// rising edge
 	begin
 		recv_buf[7:1] <= recv_buf[6:0];		//recv_buf <<= 1
 		recv_buf[0] <= ssp_dout;
+
 		if(recv_buf[7:0] == 8'hb8) begin
-			wr_en <=0;
+			fifo_wr_en <= 0;
 		end
 	end
 	if(fdt_reset) begin
-		wr_en <=1'b1;
+		fifo_wr_en <=1'b1;
 		recv_buf <=8'd0;
 	end
 end
 
 reg [3:0]rst_count;
-reg init_fifo_wr_clk;
+reg init_fifo;
 
 always @(negedge adc_clk)
 begin
@@ -418,9 +419,9 @@ begin
 				0:	fifo_rst <= 1;
 				1:	begin
 					fifo_rst <= 0;
-					init_fifo_wr_clk <=1;
+					init_fifo <=1;
 				end
-				5:	init_fifo_wr_clk <=0;
+				5:	init_fifo <=0;
 				default:
 					fifo_rst <= 0;
 				endcase
@@ -429,7 +430,7 @@ begin
 	end
 	else begin
 		rst_count <= 0;
-		init_fifo_wr_clk <=0;
+		init_fifo <=0;
 	end
 end
 
@@ -536,7 +537,7 @@ begin
 		end
 		else if(tagsim_mod)
 		begin
-			if(fifo_empty & ~wr_en) begin
+			if(fifo_underflow && ~fifo_wr_en) begin
 				// end_count <= end_count + 1;
 				// to_arm[7:0] <= end_count;
 				to_arm[7:0] <= 8'h07;
@@ -544,8 +545,8 @@ begin
 			else
 			begin
 				// end_count <= 8'd7;
-				to_arm[7:0] <= (fifo_prog_empty & fdt_indicator) ? (data_coming[1]?recv_buf[6:0]:8'd1 ): 8'd0;
-				// to_arm[7:0] <=fifo_prog_empty & fdt_indicator;
+				to_arm[7:0] <= recv_buf[7:0];
+				// to_arm[7:0] <= (fifo_prog_empty & fdt_indicator) ? 9'h1: 8'd0;
 			end
 
 			data_coming[2:1] <= data_coming[1:0];
@@ -691,19 +692,19 @@ begin
             if(sub_carrier_halfpulse_counter1 == 5'd15)
             	sub_carrier_halfpulse_counter1 <= 0;
         	else
-            sub_carrier_halfpulse_counter1 <= sub_carrier_halfpulse_counter1 + 1;
+            	sub_carrier_halfpulse_counter1 <= sub_carrier_halfpulse_counter1 + 1;
         end
     end
     else
     begin
 		pre_sub_carrier_cnt1 <= sub_carrier_cnt ;
         sub_carrier1 <= 1'd0;
-        sub_carrier_halfpulse_counter1 <= 4'd0;
+        sub_carrier_halfpulse_counter1 <= 5'd0;
     end
 
 	if(fdt_reset) begin
 		pre_sub_carrier_cnt1 <= 0;
-		sub_carrier_halfpulse_counter1 <= 0;
+		sub_carrier_halfpulse_counter1 <= 5'd0;
 	end
 end
 
@@ -726,12 +727,13 @@ begin
     else
     begin
     	pre_sub_carrier_cnt2 <= sub_carrier_cnt;
+    	sub_carrier_halfpulse_counter2 <= 5'd0;
         sub_carrier2 <= 1'd0;
     end
 
     if(fdt_reset) begin
 		pre_sub_carrier_cnt2 <= 0;
-		sub_carrier_halfpulse_counter2 <= 0;
+		sub_carrier_halfpulse_counter2 <= 5'd0;
 	end
 end
 
@@ -765,11 +767,10 @@ begin
 end
 
 assign fifo_rd_en = 1;
-assign fifo_rd_clk = ( (init_rd_clk_count > 0 && init_rd_clk_count < 6 ) ? ssp_clk :half_bit_send_over ) & tagsim_mod;
+assign fifo_rd_clk = ( (init_rd_clk_count > 0 && init_rd_clk_count < 6 ) ? ssp_clk : half_bit_send_over ) & tagsim_mod;
 // assign fifo_rd_clk = half_bit_send_over & (mod_type == `TAGSIM_MOD2);
 
-assign fifo_wr_en = wr_en;
-assign fifo_wr_clk = ( ssp_frame & (init_fifo_wr_clk | data_coming[2] & fdt_indicator) ) & tagsim_mod;
+assign fifo_wr_clk = ( ssp_frame & (init_fifo | data_coming[2] & fdt_indicator) ) & tagsim_mod;
 // assign fifo_wr_clk = ( (ssp_frame & data_coming[2] & fdt_indicator) ) & mod_type == `TAGSIM_MOD2;
 
 

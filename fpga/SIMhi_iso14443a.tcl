@@ -74,7 +74,7 @@ add wave -hex sim:/hi_iso14443a_tb/start
 
 
 add wave -unsi sim:/hi_iso14443a_tb/dut/ssp_frame
-add wave -unsi sim:/hi_iso14443a_tb/dut/init_fifo_wr_clk
+add wave -unsi sim:/hi_iso14443a_tb/dut/init_fifo
 # add wave -hex sim:/hi_iso14443a_tb/send_buf
 add wave -unsi sim:/hi_iso14443a_tb/dut/fifo/*
 
